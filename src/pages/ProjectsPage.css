@@ -1,0 +1,337 @@
+.projects-page {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* ═══ Header (shared visuals with HomePage) ═══ */
+.site-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 4rem;
+  z-index: 30;
+}
+
+.logo {
+  font-family: var(--font-script);
+  font-size: 3.2rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  user-select: none;
+}
+
+.site-nav {
+  display: flex;
+  gap: 3.5rem;
+}
+
+.site-nav a {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: #1a1a1a;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.site-nav a:hover {
+  opacity: 0.55;
+}
+
+/* ═══ Welcome title (fade in / out) ═══ */
+.projects-title {
+  position: absolute;
+  top: 30%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 20;
+  transition: opacity 0.9s ease;
+}
+
+.projects-title h1 {
+  font-family: var(--font-puhui);
+  font-size: clamp(2.5rem, 4.2vw, 5rem);
+  font-weight: 400;
+  color: #000;
+  letter-spacing: -0.01em;
+}
+
+/* ═══ Scene — wider than viewport, camera translates it ═══ */
+.scene {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  z-index: 6;
+  transition: transform 0.35s ease-out;
+  will-change: transform;
+}
+
+/* ═══ Platform — spans entire scene ═══ */
+.platform {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 3;
+}
+
+.platform-edge {
+  height: 4px;
+  background: #333;
+}
+
+.platform-floor {
+  height: 12vh;
+  background: linear-gradient(180deg, #f0f0f0, #e0e0e0);
+  border-top: 1px solid #ccc;
+}
+
+/* ═══ Project cards row ═══ */
+.projects-row {
+  position: absolute;
+  top: calc(25% - 120px);
+  left: 0;
+  right: 0;
+  height: 60%;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+.projects-row.visible {
+  opacity: 1;
+}
+
+.project-card {
+  position: absolute;
+  top: 0;
+  width: 27vw;
+  max-width: 540px;
+  transform: translateX(-50%) scale(1.2);
+  transform-origin: top center;
+  font-family: var(--font-puhui);
+}
+
+.project-number {
+  font-family: var(--font-puhui);
+  font-size: clamp(1.8rem, 2.5vw, 3rem);
+  font-weight: 400;
+  color: #808080;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.project-thumb {
+  width: 100%;
+  aspect-ratio: 527 / 386;
+  overflow: hidden;
+  background: #f0f0f0;
+  margin-bottom: 0.9rem;
+}
+
+.project-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.project-title {
+  font-family: var(--font-puhui-semibold);
+  font-weight: 600;
+  font-size: clamp(1rem, 1.25vw, 1.5rem);
+  color: #000;
+  margin-bottom: 0.15rem;
+  line-height: 1.2;
+}
+
+.project-desc {
+  font-family: var(--font-puhui);
+  font-weight: 400;
+  font-size: clamp(1rem, 1.25vw, 1.5rem);
+  color: #808080;
+  line-height: 1.2;
+}
+
+/* ═══ To Be Continued sign at end of scene ═══ */
+.to-be-continued {
+  position: absolute;
+  transform: translate(calc(-50% + 40px), 55px);
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+.to-be-continued.visible {
+  opacity: 1;
+}
+
+.to-be-continued img {
+  height: 60vh;
+  width: auto;
+  display: block;
+}
+
+/* ═══ Train (same as HomePage) ═══ */
+.train-container {
+  position: absolute;
+  width: 95vw;
+  transition: none;
+  z-index: 5;
+}
+
+.train-body {
+  width: 100%;
+  height: auto;
+  display: block;
+  position: relative;
+  z-index: 4;
+}
+
+.train-doors {
+  position: absolute;
+  left: 80%;
+  top: calc(24% + 34px);
+  width: 6.3%;
+  height: calc(49.5% + 39px);
+  display: flex;
+}
+
+.door-panel {
+  height: 100%;
+  width: 50%;
+  object-fit: fill;
+  display: block;
+  position: relative;
+  transition: transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.door-left {
+  left: 12px;
+}
+
+.door-right {
+  left: 12px;
+  transform: scaleX(-1);
+}
+
+.door-left.open {
+  transform: translateX(-60px);
+}
+
+.door-right.open {
+  transform: scaleX(-1) translateX(-60px);
+}
+
+/* ═══ Robot ═══ */
+.robot-container {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ═══ Controls hint ═══ */
+.controls-hint {
+  position: absolute;
+  bottom: 5%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: #888;
+  z-index: 20;
+  opacity: 0.8;
+}
+
+.controls-hint kbd {
+  display: inline-block;
+  background: rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  margin: 0 0.2rem;
+  color: #555;
+}
+
+/* ═══ Project detail modal ═══ */
+.project-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 25, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.project-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 2.5rem 3rem;
+  max-width: 560px;
+  width: 90%;
+  text-align: left;
+  font-family: var(--font-puhui);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.project-modal-number {
+  font-family: var(--font-puhui);
+  font-size: 1.2rem;
+  color: #808080;
+  margin-bottom: 0.4rem;
+}
+
+.project-modal h2 {
+  font-family: var(--font-puhui-semibold);
+  font-size: 2rem;
+  font-weight: 600;
+  color: #000;
+  margin-bottom: 0.6rem;
+}
+
+.project-modal p {
+  font-size: 1rem;
+  color: #808080;
+  line-height: 1.5;
+  margin-bottom: 2rem;
+}
+
+.project-modal button {
+  font-family: var(--font-body);
+  padding: 0.6rem 1.6rem;
+  border: 1px solid #333;
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.project-modal button:hover {
+  background: #1a1a1a;
+  color: #fff;
+}

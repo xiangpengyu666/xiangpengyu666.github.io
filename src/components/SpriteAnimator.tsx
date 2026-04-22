@@ -1,4 +1,11 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect } from 'react';
+
+import idleSrc from '../Spritesheet/idle_spritesheet.png';
+import greetingSrc from '../Spritesheet/greeting_spritesheet.png';
+import jumpSrc from '../Spritesheet/jump_spritesheet.png';
+import boardSrc from '../Spritesheet/board_spritesheet.png';
+import runRightSrc from '../Spritesheet/run_right_spritesheet.png';
+import turnToRightSrc from '../Spritesheet/turn_to_right_spritesheet.png';
 
 export interface SpriteConfig {
   src: string;
@@ -8,38 +15,53 @@ export interface SpriteConfig {
   totalFrames: number;
   fps: number;
   loop: boolean;
+  scale?: number;  // multiplier applied to ROBOT_SIZE, default 1
+  xOffset?: number; // px to shift right, default 0
+  yOffset?: number; // px to shift down, default 0
+  // Per-frame extra Y offset applied to the canvas itself (negative = up).
+  // Lerps from 0 → deltaY across [startFrame, endFrame], then holds at deltaY.
+  frameYRamp?: { startFrame: number; endFrame: number; deltaY: number };
 }
 
 export const SPRITES: Record<string, SpriteConfig> = {
   idle: {
-    src: '/sprites/idle_spritesheet.png',
-    frameWidth: 138, frameHeight: 185,
-    columns: 4, totalFrames: 4, fps: 6, loop: true,
+    src: idleSrc,
+    frameWidth: 144, frameHeight: 190,
+    columns: 1, totalFrames: 1, fps: 6, loop: true,
+    scale: 0.8,
   },
   greeting: {
-    src: '/sprites/greeting_spritesheet.png',
-    frameWidth: 171, frameHeight: 193,
-    columns: 15, totalFrames: 76, fps: 12, loop: false,
+    src: greetingSrc,
+    frameWidth: 315, frameHeight: 177,
+    columns: 13, totalFrames: 151, fps: 24, loop: false,
+    yOffset: 10,
   },
   jump: {
-    src: '/sprites/jump_spritesheet.png',
-    frameWidth: 156, frameHeight: 192,
-    columns: 10, totalFrames: 30, fps: 15, loop: false,
+    src: jumpSrc,
+    frameWidth: 455, frameHeight: 256,
+    columns: 9, totalFrames: 54, fps: 15, loop: false,
+    yOffset: 10,
   },
   boardTrain: {
-    src: '/sprites/board_train_spritesheet.png',
-    frameWidth: 139, frameHeight: 191,
-    columns: 10, totalFrames: 54, fps: 15, loop: false,
+    src: boardSrc,
+    frameWidth: 144, frameHeight: 190,
+    columns: 10, totalFrames: 48, fps: 15, loop: false,
+    scale: 0.9,
+    xOffset: 6,
+    yOffset: 10,
+    frameYRamp: { startFrame: 12, endFrame: 18, deltaY: -34 },
   },
-  runLeft: {
-    src: '/sprites/run_left_spritesheet.png',
-    frameWidth: 105, frameHeight: 187,
-    columns: 12, totalFrames: 12, fps: 15, loop: true,
+  runRight: {
+    src: runRightSrc,
+    frameWidth: 1024, frameHeight: 576,
+    columns: 4, totalFrames: 11, fps: 15, loop: true,
+    yOffset: 10,
   },
   turnToLeft: {
-    src: '/sprites/turn_to_left_spritesheet.png',
-    frameWidth: 138, frameHeight: 188,
-    columns: 8, totalFrames: 16, fps: 15, loop: false,
+    src: turnToRightSrc,
+    frameWidth: 819, frameHeight: 460,
+    columns: 5, totalFrames: 25, fps: 180, loop: false,
+    yOffset: 10,
   },
 };
 
@@ -64,80 +86,109 @@ export default function SpriteAnimator({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const completedRef = useRef(false);
 
-  // Load image
+  // Keep latest props in refs so the animation loop never needs to be restarted on prop changes
+  const spriteRef = useRef(sprite);
+  const widthRef = useRef(width);
+  const heightRef = useRef(height);
+  const flipXRef = useRef(flipX);
+  const onCompleteRef = useRef(onComplete);
+  spriteRef.current = sprite;
+  widthRef.current = width;
+  heightRef.current = height;
+  flipXRef.current = flipX;
+  onCompleteRef.current = onComplete;
+
+  // Load image and reset frame state when sprite source changes
   useEffect(() => {
+    imgRef.current = null;
+    frameRef.current = 0;
+    lastTimeRef.current = 0;
+    completedRef.current = false;
     const img = new Image();
     img.src = sprite.src;
     img.onload = () => { imgRef.current = img; };
-    completedRef.current = false;
-    frameRef.current = 0;
-    lastTimeRef.current = 0;
     return () => { imgRef.current = null; };
   }, [sprite.src]);
 
-  const draw = useCallback((timestamp: number) => {
-    if (!imgRef.current || !canvasRef.current || !playing) return;
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
+  // Single animation loop — only restarts when playing toggles
+  useEffect(() => {
+    if (!playing) return;
 
-    const interval = 1000 / sprite.fps;
-    if (timestamp - lastTimeRef.current >= interval) {
-      lastTimeRef.current = timestamp;
+    frameRef.current = 0;
+    lastTimeRef.current = 0;
+    completedRef.current = false;
 
-      const col = frameRef.current % sprite.columns;
-      const row = Math.floor(frameRef.current / sprite.columns);
+    const draw = (timestamp: number) => {
+      const sp = spriteRef.current;
+      const w = widthRef.current;
+      const h = heightRef.current;
+      const fx = flipXRef.current;
+      const canvas = canvasRef.current;
+      const img = imgRef.current;
 
-      ctx.clearRect(0, 0, width, height);
-      ctx.save();
-      if (flipX) {
-        ctx.translate(width, 0);
-        ctx.scale(-1, 1);
+      // Image not loaded yet — keep waiting
+      if (!img || !canvas) {
+        animRef.current = requestAnimationFrame(draw);
+        return;
       }
-      ctx.drawImage(
-        imgRef.current,
-        col * sprite.frameWidth, row * sprite.frameHeight,
-        sprite.frameWidth, sprite.frameHeight,
-        0, 0, width, height
-      );
-      ctx.restore();
 
-      frameRef.current++;
-      if (frameRef.current >= sprite.totalFrames) {
-        if (sprite.loop) {
-          frameRef.current = 0;
-        } else {
-          frameRef.current = sprite.totalFrames - 1;
-          if (!completedRef.current) {
-            completedRef.current = true;
-            onComplete?.();
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const interval = 1000 / sp.fps;
+      if (timestamp - lastTimeRef.current >= interval) {
+        lastTimeRef.current = timestamp;
+
+        const col = frameRef.current % sp.columns;
+        const row = Math.floor(frameRef.current / sp.columns);
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.save();
+        if (fx) {
+          ctx.translate(w, 0);
+          ctx.scale(-1, 1);
+        }
+        ctx.drawImage(
+          img,
+          col * sp.frameWidth, row * sp.frameHeight,
+          sp.frameWidth, sp.frameHeight,
+          0, 0, w, h
+        );
+        ctx.restore();
+
+        // Per-frame Y ramp (e.g. boardTrain steps up during frames 12-18)
+        if (sp.frameYRamp) {
+          const { startFrame, endFrame, deltaY } = sp.frameYRamp;
+          const f = frameRef.current;
+          let extraY = 0;
+          if (f >= endFrame) extraY = deltaY;
+          else if (f > startFrame) extraY = deltaY * ((f - startFrame) / (endFrame - startFrame));
+          canvas.style.transform = `translateY(${extraY}px)`;
+        } else if (canvas.style.transform) {
+          canvas.style.transform = '';
+        }
+
+        frameRef.current++;
+        if (frameRef.current >= sp.totalFrames) {
+          if (sp.loop) {
+            frameRef.current = 0;
+          } else {
+            frameRef.current = sp.totalFrames - 1;
+            if (!completedRef.current) {
+              completedRef.current = true;
+              onCompleteRef.current?.();
+            }
+            return;
           }
-          return;
         }
       }
-    }
-    animRef.current = requestAnimationFrame(draw);
-  }, [playing, sprite, width, height, flipX, onComplete]);
 
-  useEffect(() => {
-    if (playing && imgRef.current) {
-      completedRef.current = false;
-      frameRef.current = 0;
       animRef.current = requestAnimationFrame(draw);
-    }
-    return () => cancelAnimationFrame(animRef.current);
-  }, [playing, draw]);
+    };
 
-  // Keep animating for looping sprites
-  useEffect(() => {
-    if (playing) {
-      const loop = (t: number) => {
-        draw(t);
-        if (playing) animRef.current = requestAnimationFrame(loop);
-      };
-      animRef.current = requestAnimationFrame(loop);
-      return () => cancelAnimationFrame(animRef.current);
-    }
-  }, [playing, draw]);
+    animRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [playing, sprite.src]);
 
   return (
     <canvas

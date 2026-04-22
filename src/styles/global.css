@@ -11,6 +11,9 @@
   --font-display: 'Instrument Serif', Georgia, serif;
   --font-body: 'DM Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  --font-script: 'Caveat', cursive;
+  --font-puhui: 'Alibaba PuHuiTi 3.0 55 Regular', 'DM Sans', sans-serif;
+  --font-puhui-semibold: 'Alibaba PuHuiTi 3.0 75 SemiBold', 'DM Sans', sans-serif;
 }
 
 html, body, #root {

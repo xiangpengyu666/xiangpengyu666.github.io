@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
 import './HomePage.css';
 
@@ -11,22 +12,32 @@ type Phase =
   | 'doors-open'     // doors open, waiting for user
   | 'boarding'       // user pressed space at door, boarding animation
   | 'destination'    // destination selection popup
+  | 'departing'      // destination chosen, train slides off-screen right
   ;
+
+const DEST_ROUTES: Record<string, string> = {
+  Projects: '/projects',
+  Gallery: '/gallery',
+  Blog: '/blog',
+  Contact: '/contact',
+};
 
 type RobotAnim = 'idle' | 'greeting' | 'turnLeft' | 'runLeft' | 'turnRight' | 'runRight' | 'jump' | 'boardTrain';
 
 const ROBOT_SIZE = 130;
-const PLATFORM_Y = 75; // % from top where platform floor is
-const MOVE_SPEED = 4;
+const PLATFORM_Y = 88; // % from top where platform floor is
+const MOVE_SPEED = 0.5;
 
 export default function HomePage() {
   const [phase, setPhase] = useState<Phase>('idle-start');
   const [robotAnim, setRobotAnim] = useState<RobotAnim>('idle');
   const [robotX, setRobotX] = useState(50); // % from left
-  const [trainX, setTrainX] = useState(-60); // % from left (off screen)
+  const [trainX, setTrainX] = useState(-100); // % from left (off screen)
   const [doorsOpen, setDoorsOpen] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [showDestination, setShowDestination] = useState(false);
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+  const navigate = useNavigate();
   const keysRef = useRef<Set<string>>(new Set());
   const frameLoopRef = useRef<number>(0);
   const trainAnimRef = useRef<number>(0);
@@ -53,8 +64,9 @@ export default function HomePage() {
   // Train arrival animation
   useEffect(() => {
     if (phase !== 'train-arriving') return;
-    const targetX = 15; // train stops here (% from left)
-    let currentX = -60;
+    // Stop with ~55% of the train off-screen left; right portion visible from screen left.
+    const targetX = -55;
+    let currentX = -100;
 
     const animate = () => {
       const diff = targetX - currentX;
@@ -79,20 +91,42 @@ export default function HomePage() {
     return () => cancelAnimationFrame(trainAnimRef.current);
   }, [phase]);
 
+  // Departing: train slides off-screen right at constant speed, then navigates
+  useEffect(() => {
+    if (phase !== 'departing') return;
+    const targetX = 100; // off-screen right
+    const SPEED = 45;    // % of viewport per second — constant velocity
+    let currentX = trainX;
+    let lastT = 0;
+    let raf = 0;
+    const animate = (t: number) => {
+      if (lastT === 0) lastT = t;
+      const dt = (t - lastT) / 1000;
+      lastT = t;
+      currentX += SPEED * dt;
+      if (currentX >= targetX) {
+        setTrainX(targetX);
+        if (pendingRoute) navigate(pendingRoute);
+        return;
+      }
+      setTrainX(currentX);
+      raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   // Keyboard input
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       keysRef.current.add(e.key);
 
-      // Space to board
+      // Space to board — auto-walks to the door center, then plays board animation
       if (e.key === ' ' && phase === 'doors-open') {
-        const doorCenterX = getDoorCenterPercent();
-        if (Math.abs(robotX - doorCenterX) < 6) {
-          e.preventDefault();
-          setShowHint(false);
-          setPhase('boarding');
-          setRobotAnim('boardTrain');
-        }
+        e.preventDefault();
+        setShowHint(false);
+        setPhase('boarding');
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -154,6 +188,37 @@ export default function HomePage() {
     return () => cancelAnimationFrame(frameLoopRef.current);
   }, [phase]);
 
+  // Boarding: auto-walk robot to door center, then play board animation
+  useEffect(() => {
+    if (phase !== 'boarding') return;
+    const targetX = getDoorCenterPercent();
+    let currentX = robotX;
+
+    if (Math.abs(currentX - targetX) < 0.3) {
+      setRobotX(targetX);
+      setRobotAnim('boardTrain');
+      return;
+    }
+
+    setRobotAnim(currentX < targetX ? 'runRight' : 'runLeft');
+    let raf = 0;
+    const step = () => {
+      const diff = targetX - currentX;
+      if (Math.abs(diff) < 0.3) {
+        currentX = targetX;
+        setRobotX(targetX);
+        setRobotAnim('boardTrain');
+        return;
+      }
+      currentX += diff * 0.08;
+      setRobotX(currentX);
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   // Turn complete -> start running
   const onTurnComplete = useCallback(() => {
     setRobotAnim(prev => {
@@ -163,16 +228,19 @@ export default function HomePage() {
     });
   }, []);
 
-  // Board complete -> show destination
+  // Board complete -> close door, then show destination
   const onBoardComplete = useCallback(() => {
-    setShowDestination(true);
-    setPhase('destination');
+    setDoorsOpen(false); // door slides right (back to closed)
+    setTimeout(() => {
+      setShowDestination(true);
+      setPhase('destination');
+    }, 800); // wait for door close animation (0.7s) + small buffer
   }, []);
 
   // Get door center position as percentage
   const getDoorCenterPercent = () => {
-    // Door is roughly at center of train
-    return trainX + 30; // approximate door center
+    // Door overlay center at 83.5% of train width (left:80% + width:7%/2); train is 95vw
+    return trainX + 0.835 * 95;
   };
 
   // Get current sprite config
@@ -180,54 +248,71 @@ export default function HomePage() {
     switch (robotAnim) {
       case 'idle': return { sprite: SPRITES.idle, flip: false };
       case 'greeting': return { sprite: SPRITES.greeting, flip: false };
-      case 'turnLeft': return { sprite: SPRITES.turnToLeft, flip: false };
-      case 'runLeft': return { sprite: SPRITES.runLeft, flip: false };
-      case 'turnRight': return { sprite: SPRITES.turnToLeft, flip: true };
-      case 'runRight': return { sprite: SPRITES.runLeft, flip: true };
+      case 'turnLeft': return { sprite: SPRITES.turnToLeft, flip: true };
+      case 'runLeft': return { sprite: SPRITES.runRight, flip: true };
+      case 'turnRight': return { sprite: SPRITES.turnToLeft, flip: false };
+      case 'runRight': return { sprite: SPRITES.runRight, flip: false };
       case 'jump': return { sprite: SPRITES.jump, flip: false };
       case 'boardTrain': return { sprite: SPRITES.boardTrain, flip: false };
     }
   };
 
   const { sprite: currentSprite, flip } = getCurrentSprite();
+  const scale = currentSprite.scale ?? 1;
+  const xOffset = currentSprite.xOffset ?? 0;
+  const yOffset = currentSprite.yOffset ?? 0;
   const aspectRatio = currentSprite.frameWidth / currentSprite.frameHeight;
 
   return (
     <div className="homepage">
+      {/* Header — logo + nav */}
+      <header className="site-header">
+        <div className="logo">Xp</div>
+        <nav className="site-nav">
+          <a href="#about">About</a>
+          <a href="#projects">Projects</a>
+          <a href="#blog">Blog</a>
+          <a href="#contact">Contact</a>
+        </nav>
+      </header>
+
+      {/* Welcome text */}
+      <section className="welcome">
+        <h1>Hi! I'm Xiangpeng,</h1>
+        <h1>An interdisciplinary designer and engineer.</h1>
+        <p>Industrial Design, Game Design, IoT, Robotics</p>
+      </section>
+
       {/* Background - Station */}
       <div className="station-bg">
-        <div className="station-wall">
-          <div className="station-sign">
-            <span className="station-sign-text">HOME</span>
-          </div>
-          <div className="station-pillars">
-            {[20, 40, 60, 80].map(x => (
-              <div key={x} className="station-pillar" style={{ left: `${x}%` }} />
-            ))}
-          </div>
-        </div>
 
         {/* Train */}
         <div
           className="train-container"
           style={{
             left: `${trainX}%`,
-            bottom: `${100 - PLATFORM_Y + 2}%`,
+            bottom: `${100 - PLATFORM_Y}%`,
           }}
         >
           <img src="/sprites/train_final_v2.png" alt="train" className="train-body" />
           {/* Doors */}
-          <div className="train-doors">
+          <div
+            className="train-doors"
+            style={{
+              // Lift doors above robot (z 10) and hint bubble (z 20) so the
+              // panels cover the robot mid-board.
+              zIndex: phase === 'boarding' && !doorsOpen ? 30 : 4,
+            }}
+          >
             <img
-              src="/sprites/door_panel_v2.png"
+              src="/sprites/door_panel_v3.png"
               alt="door-left"
               className={`door-panel door-left ${doorsOpen ? 'open' : ''}`}
             />
             <img
-              src="/sprites/door_panel_v2.png"
+              src="/sprites/door_panel_v3.png"
               alt="door-right"
               className={`door-panel door-right ${doorsOpen ? 'open' : ''}`}
-              style={{ transform: 'scaleX(-1)' }}
             />
           </div>
         </div>
@@ -238,14 +323,17 @@ export default function HomePage() {
           <div className="platform-floor" />
         </div>
 
-        {/* Robot */}
-        {phase !== 'destination' && (
+        {/* Robot — hidden once user enters destination flow (already on the train) */}
+        {phase !== 'destination' && phase !== 'departing' && (
           <div
             className="robot-container"
             style={{
               left: `${robotX}%`,
               bottom: `${100 - PLATFORM_Y}%`,
-              transform: 'translateX(-50%)',
+              transform: `translateX(calc(-50% + ${xOffset}px)) translateY(${yOffset}px)`,
+              // Drop robot below doors (z 30) during the closing animation so the
+              // panels visually cover it as they slide back into place.
+              zIndex: phase === 'boarding' && !doorsOpen ? 1 : 10,
             }}
           >
             {/* Hint bubble */}
@@ -256,8 +344,8 @@ export default function HomePage() {
             )}
             <SpriteAnimator
               sprite={currentSprite}
-              width={ROBOT_SIZE * aspectRatio}
-              height={ROBOT_SIZE}
+              width={ROBOT_SIZE * scale * aspectRatio}
+              height={ROBOT_SIZE * scale}
               flipX={flip}
               playing={true}
               onComplete={
@@ -269,17 +357,10 @@ export default function HomePage() {
             />
           </div>
         )}
+
       </div>
 
       {/* Welcome text */}
-      <div className="welcome-text">
-        <h1>
-          Hi! I'm <em>Xiangpeng</em>,
-        </h1>
-        <p>An interdisciplinary designer and engineer.</p>
-        <p className="welcome-sub">Industrial Design, UX Design, IoT, Robotics</p>
-      </div>
-
       {/* Arrow key hint */}
       {(phase === 'free-roam' || phase === 'train-arriving' || phase === 'train-stopped' || phase === 'doors-open') && (
         <div className="controls-hint">
@@ -304,8 +385,9 @@ export default function HomePage() {
                   key={dest.label}
                   className="destination-btn"
                   onClick={() => {
-                    // TODO: navigate to page
-                    console.log('Navigate to:', dest.label);
+                    setPendingRoute(DEST_ROUTES[dest.label] ?? '/');
+                    setShowDestination(false);
+                    setPhase('departing');
                   }}
                 >
                   <span className="dest-icon">{dest.icon}</span>
