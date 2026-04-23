@@ -48,7 +48,7 @@ export const SPRITES: Record<string, SpriteConfig> = {
     columns: 10, totalFrames: 48, fps: 15, loop: false,
     scale: 0.9,
     xOffset: 6,
-    yOffset: 10,
+    yOffset: 0,
     frameYRamp: { startFrame: 12, endFrame: 18, deltaY: -34 },
   },
   runRight: {

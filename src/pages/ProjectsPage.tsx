@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
+import useUiScale from '../hooks/useUiScale';
 import './ProjectsPage.css';
 
 type Phase =
@@ -21,6 +22,9 @@ type RobotAnim = 'idle' | 'turnLeft' | 'runLeft' | 'turnRight' | 'runRight' | 'j
 const ROBOT_SIZE = 130;
 const PLATFORM_Y = 88;
 const MOVE_SPEED = 0.5;
+// Keep in sync with --train-scale in ProjectsPage.css
+const TRAIN_SCALE = 1.25;
+const TRAIN_WIDTH_VW = 95 * TRAIN_SCALE;
 
 // Scene is wider than viewport — project cards laid out along it.
 // 300vw gives room for 5 cards plus spacing.
@@ -37,10 +41,11 @@ const PROJECTS = [
 const TO_BE_CONTINUED_X_VW = 265;
 
 export default function ProjectsPage() {
+  const uiScale = useUiScale();
   const [phase, setPhase] = useState<Phase>('train-entering');
   const [robotAnim, setRobotAnim] = useState<RobotAnim>('idle');
   const [robotX, setRobotX] = useState(0);     // vw in scene coordinates
-  const [trainX, setTrainX] = useState(-100);  // % from left of viewport
+  const [trainX, setTrainX] = useState(-TRAIN_WIDTH_VW);  // % from left (fully off-screen left)
   const [doorsOpen, setDoorsOpen] = useState(false);
   const [robotVisible, setRobotVisible] = useState(false); // hidden until exits train
   const [titleOpacity, setTitleOpacity] = useState(0);
@@ -55,13 +60,13 @@ export default function ProjectsPage() {
   const trainAnimRef = useRef<number>(0);
 
   // Helper: door center in viewport percent
-  const getDoorCenterPercent = useCallback(() => trainX + 0.835 * 95, [trainX]);
+  const getDoorCenterPercent = useCallback(() => trainX + 0.835 * TRAIN_WIDTH_VW, [trainX]);
 
   // ═══ Phase 1: Train enters from left, stops ═══
   useEffect(() => {
     if (phase !== 'train-entering') return;
-    const targetX = -55;
-    let currentX = -100;
+    const targetX = -77;
+    let currentX = -TRAIN_WIDTH_VW;
     const animate = () => {
       const diff = targetX - currentX;
       if (Math.abs(diff) < 0.3) {
@@ -82,10 +87,10 @@ export default function ProjectsPage() {
   // ═══ Phase 2: Robot appears at door (idle, raised 20px), doors open, pause 500ms ═══
   useEffect(() => {
     if (phase !== 'doors-opening') return;
-    // Place robot at door, idle, raised 20px (standing on train floor)
+    // Place robot at door, idle, raised ~31px (standing on train floor)
     setRobotX(getDoorCenterPercent());
     setRobotDxPx(0);
-    setRobotDyPx(-26);
+    setRobotDyPx(-31 * uiScale);
     setRobotAnim('idle');
     setRobotVisible(true);
     // Open doors (CSS transition ~0.7s), then pause 500ms before disembark
@@ -101,8 +106,8 @@ export default function ProjectsPage() {
     const duration = 1500;
     const t0 = performance.now();
     const startDx = 0;
-    const startDy = -26;
-    const targetDx = 40;
+    const startDy = -31 * uiScale;
+    const targetDx = 40 * uiScale;
     const targetDy = 0;
     let raf = 0;
     const step = (t: number) => {
@@ -303,7 +308,7 @@ export default function ProjectsPage() {
   const aspectRatio = currentSprite.frameWidth / currentSprite.frameHeight;
 
   return (
-    <div className="projects-page">
+    <div className="projects-page" style={{ ['--ui-scale' as string]: uiScale } as CSSProperties}>
       {/* Header — same as home */}
       <header className="site-header">
         <div className="logo">Xp</div>
@@ -373,13 +378,13 @@ export default function ProjectsPage() {
             style={{
               left: `${robotX}vw`,
               bottom: `calc(${100 - PLATFORM_Y}% - 3px)`,
-              transform: `translateX(calc(-50% + ${xOffset + robotDxPx}px)) translateY(${yOffset + robotDyPx}px)`,
+              transform: `translateX(calc(-50% + ${xOffset * uiScale + robotDxPx}px)) translateY(${yOffset * uiScale + robotDyPx}px)`,
             }}
           >
             <SpriteAnimator
               sprite={currentSprite}
-              width={ROBOT_SIZE * scale * aspectRatio}
-              height={ROBOT_SIZE * scale}
+              width={ROBOT_SIZE * uiScale * scale * aspectRatio}
+              height={ROBOT_SIZE * uiScale * scale}
               flipX={flip}
               playing={true}
               onComplete={
@@ -400,13 +405,13 @@ export default function ProjectsPage() {
           className="train-container"
           style={{
             left: `${trainX}%`,
-            bottom: `${100 - PLATFORM_Y}%`,
+            bottom: `calc(${100 - PLATFORM_Y}% - ${5 * uiScale}px)`,
             // No stacking context, so .train-doors' z-index escapes and competes
             // directly with .scene (z 6) for proper layering with the robot.
             zIndex: 'auto',
           }}
         >
-          <img src="/sprites/train_final_v2.png" alt="train" className="train-body" />
+          <img src={`${import.meta.env.BASE_URL}sprites/Final_train.png`} alt="train" className="train-body" />
           <div
             className="train-doors"
             style={{

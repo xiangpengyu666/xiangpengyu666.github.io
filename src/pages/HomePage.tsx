@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
+import useUiScale from '../hooks/useUiScale';
 import './HomePage.css';
 
 type Phase =
@@ -27,12 +28,16 @@ type RobotAnim = 'idle' | 'greeting' | 'turnLeft' | 'runLeft' | 'turnRight' | 'r
 const ROBOT_SIZE = 130;
 const PLATFORM_Y = 88; // % from top where platform floor is
 const MOVE_SPEED = 0.5;
+// Keep in sync with --train-scale in HomePage.css
+const TRAIN_SCALE = 1.25;
+const TRAIN_WIDTH_VW = 95 * TRAIN_SCALE;
 
 export default function HomePage() {
+  const uiScale = useUiScale();
   const [phase, setPhase] = useState<Phase>('idle-start');
   const [robotAnim, setRobotAnim] = useState<RobotAnim>('idle');
   const [robotX, setRobotX] = useState(50); // % from left
-  const [trainX, setTrainX] = useState(-100); // % from left (off screen)
+  const [trainX, setTrainX] = useState(-TRAIN_WIDTH_VW); // % from left (fully off-screen left)
   const [doorsOpen, setDoorsOpen] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [showDestination, setShowDestination] = useState(false);
@@ -64,9 +69,8 @@ export default function HomePage() {
   // Train arrival animation
   useEffect(() => {
     if (phase !== 'train-arriving') return;
-    // Stop with ~55% of the train off-screen left; right portion visible from screen left.
-    const targetX = -55;
-    let currentX = -100;
+    const targetX = -77;
+    let currentX = -TRAIN_WIDTH_VW;
 
     const animate = () => {
       const diff = targetX - currentX;
@@ -239,8 +243,8 @@ export default function HomePage() {
 
   // Get door center position as percentage
   const getDoorCenterPercent = () => {
-    // Door overlay center at 83.5% of train width (left:80% + width:7%/2); train is 95vw
-    return trainX + 0.835 * 95;
+    // Door overlay center at 83.5% of train width (left:80% + width:7%/2)
+    return trainX + 0.835 * TRAIN_WIDTH_VW;
   };
 
   // Get current sprite config
@@ -264,7 +268,7 @@ export default function HomePage() {
   const aspectRatio = currentSprite.frameWidth / currentSprite.frameHeight;
 
   return (
-    <div className="homepage">
+    <div className="homepage" style={{ ['--ui-scale' as string]: uiScale } as CSSProperties}>
       {/* Header — logo + nav */}
       <header className="site-header">
         <div className="logo">Xp</div>
@@ -291,10 +295,10 @@ export default function HomePage() {
           className="train-container"
           style={{
             left: `${trainX}%`,
-            bottom: `${100 - PLATFORM_Y}%`,
+            bottom: `calc(${100 - PLATFORM_Y}% - ${5 * uiScale}px)`,
           }}
         >
-          <img src="/sprites/train_final_v2.png" alt="train" className="train-body" />
+          <img src={`${import.meta.env.BASE_URL}sprites/Final_train.png`} alt="train" className="train-body" />
           {/* Doors */}
           <div
             className="train-doors"
@@ -330,7 +334,7 @@ export default function HomePage() {
             style={{
               left: `${robotX}%`,
               bottom: `${100 - PLATFORM_Y}%`,
-              transform: `translateX(calc(-50% + ${xOffset}px)) translateY(${yOffset}px)`,
+              transform: `translateX(calc(-50% + ${xOffset * uiScale}px)) translateY(${yOffset * uiScale}px)`,
               // Drop robot below doors (z 30) during the closing animation so the
               // panels visually cover it as they slide back into place.
               zIndex: phase === 'boarding' && !doorsOpen ? 1 : 10,
@@ -344,8 +348,8 @@ export default function HomePage() {
             )}
             <SpriteAnimator
               sprite={currentSprite}
-              width={ROBOT_SIZE * scale * aspectRatio}
-              height={ROBOT_SIZE * scale}
+              width={ROBOT_SIZE * uiScale * scale * aspectRatio}
+              height={ROBOT_SIZE * uiScale * scale}
               flipX={flip}
               playing={true}
               onComplete={

@@ -28,13 +28,16 @@ idle-start → greeting → free-roam → train-arriving → train-stopped → d
 
 - The robot character is positioned with `robotX` (% from left), sitting on the platform at `PLATFORM_Y = 88%`.
 - Keyboard input (`←/→` or `a/d`) is captured via a ref-based `Set<string>` to avoid re-render lag; movement runs in a `requestAnimationFrame` loop.
-- The train slides in via its own rAF loop (ease-out lerp); `trainX` starts at `-100%` and stops at `-55%` so most of the front of the train is off-screen left and the door/rear extends into the viewport. Train width = `95vw`.
-- The door overlay (`.train-doors`) aligns to the rightmost (door-less) entrance in `train_final_v2.png`. **Double sliding doors**: two `door_panel_v3.png` panels (right one mirrored via `scaleX(-1)`) sit closed during arrival to match the closed doors painted at the train's other entrances; on `.open` they slide outward (left panel left, right panel right). After the boarding animation completes, `setDoorsOpen(false)` closes them before the destination modal appears.
-- **Door positioning is pixel-tuned to `train_final_v2.png` — do not "clean up" without re-aligning visually**:
-  - `.train-doors { left: 80%; top: calc(24% + 34px); width: 6.3%; height: calc(49.5% + 39px); }` (overlay box on the train)
+- The train slides in via its own rAF loop (ease-out lerp); `trainX` starts at `-TRAIN_WIDTH_VW` (fully off-screen left) and stops at `-77%`, which puts the door center at ~17% of the viewport. Train width = `calc(95vw * var(--train-scale))` — `TRAIN_SCALE = 1.25` in both TS and CSS (keep in sync). The train is also nudged down by `5px * uiScale` (inline style) to sit a touch below the platform line.
+- The door overlay (`.train-doors`) aligns to the rightmost (door-less) entrance in `Final_train.png`. **Double sliding doors**: two `door_panel_v3.png` panels (right one mirrored via `scaleX(-1)`) sit closed during arrival to match the closed doors painted at the train's other entrances; on `.open` they slide outward (left panel left, right panel right). After the boarding animation completes, `setDoorsOpen(false)` closes them before the destination modal appears.
+- **Door positioning is pixel-tuned to `Final_train.png` (4096×808, aspect 5.07:1) — do not "clean up" without re-aligning visually**. All offsets are `vw * var(--train-scale)` so they scale *with the train* (not with `--ui-scale`, which is dampened on large screens):
+  - `.train-doors { left: 80%; top: calc(24% + 1.471vw * var(--train-scale)); width: 6.3%; height: calc(49.5% + 2.153vw * var(--train-scale)); }` (overlay box on the train)
   - `.door-panel { width: 50%; object-fit: fill; position: relative; }` — `fill` lets panels stretch vertically without distorting horizontal width
-  - `.door-left { left: 12px; }` and `.door-right { left: 12px; transform: scaleX(-1); }` — small `left` nudges seat each panel inside its half of the entrance frame
-- Space-to-board is gated: robot must be within 6% of `getDoorCenterPercent()` (`trainX + 0.83 * 95`, i.e. door center as % of viewport width).
+  - `.door-left { left: calc(0.667vw * var(--train-scale)); }` / `.door-right` (same `left` + `scaleX(-1)`) — nudges each panel inside its half of the entrance frame
+  - Open: `.door-{left,right}.open` translate ±`3.333vw * var(--train-scale)` outward
+  - Why vw, not px×ui-scale? Doors must track the train (sized in vw). With linear ui-scale it worked, but once ui-scale got dampened on big screens, doors shrank slower than the train. Switching to vw pins them to the train's actual rendered size.
+  - Base-unit convention: to tune by N screen pixels at 1440px viewport, convert via `N / 14.4` vw in the base value (e.g. top was nudged +6px → +0.417vw into the 1.471 figure).
+- Space-to-board is gated: robot must be within 6% of `getDoorCenterPercent()` (`trainX + 0.835 * TRAIN_WIDTH_VW`, i.e. door center as % of viewport width).
 - Above the station scene, `<header className="site-header">` (Xp logo + nav) and `<section className="welcome">` (intro text) are absolutely positioned overlays.
 - **Boarding close: robot vanishes via z-index trick, not opacity/conditional render**:
   - During `phase === 'boarding' && !doorsOpen`, robot's inline `zIndex: 1` drops it BELOW `.train-body` (z-index: 4 in CSS), so the opaque train PNG instantly hides the entire robot.
@@ -51,10 +54,19 @@ idle-start → greeting → free-roam → train-arriving → train-stopped → d
 - All props (`sprite`, `width`, `height`, `flipX`, `onComplete`) are mirrored into refs each render so the single rAF loop never needs to restart on prop changes — only `playing` and `sprite.src` changes restart the loop.
 - When a non-looping animation completes, the loop stops; it restarts when `sprite.src` changes (i.e. when the next animation is assigned).
 
+### Responsive scaling (`src/hooks/useUiScale.ts`)
+
+The interactive scenes are scaled by a single factor `--ui-scale` injected as a CSS variable onto `.homepage` / `.projects-page`, and also consumed directly in TSX (robot size, sprite offsets, disembark px offsets, train bottom nudge).
+
+- Formula: `raw = innerWidth / 1440`; below baseline it's linear, above baseline dampened: `1 + (raw - 1) * 0.5`, then clamped to `[0.6, 3]`. The dampening is **intentional** — pure linear scaling looks oversized on large monitors because rem/px values grow 1:1 with the viewport while human perception is sublinear.
+- **Unit rules**: `rem` and `px` MUST multiply by `var(--ui-scale)` to track viewport. `vw` / `vh` / `%` already scale linearly — do **not** multiply them again or you'll double-scale (this already bit me with `.project-card` width).
+- **Train / door / project-card use vw** (fully linear with viewport), NOT `ui-scale` — they're "world" elements that should track the screen 1:1. The dampening applies to text, nav, robot, and small px nudges only.
+- A second variable `--train-scale: 1.25` (mirrored as `TRAIN_SCALE` constant in both TSX files) scales just the train assembly — bump it to make the train bigger without touching everything else. `TRAIN_WIDTH_VW = 95 * TRAIN_SCALE` is used in the TSX door-center formula.
+
 ### Assets
 
 - `src/Spritesheet/` — sprite sheet PNGs, imported directly via Vite in `SpriteAnimator.tsx` (hashed at build time)
-- `public/sprites/` — train and door images only (`train_final_v2.png` 4096×808, `door_panel_v3.png` 290×998 with alpha), referenced by URL string in `HomePage.tsx`. The door PNG **has transparent edges** — never assume opaque coverage.
+- `public/sprites/` — train and door images only (`Final_train.png` 4096×808, `door_panel_v3.png` 290×998 with alpha), referenced by URL string in `HomePage.tsx` / `ProjectsPage.tsx` via `${import.meta.env.BASE_URL}sprites/...` (so gh-pages subpaths work). The door PNG **has transparent edges** — never assume opaque coverage. Filename casing matters — gh-pages is case-sensitive.
 - `public/projects/` — 5 project covers + `to-be-continued.webp` (Figma exports, ~360 KB total after compression)
 - `scripts/compress-projects.mjs` — sharp-based one-shot script to convert `public/projects/*.png` → `*.webp` (width 1200, quality 80). Run via `node scripts/compress-projects.mjs` after dropping in new PNGs from Figma.
 - `jump_spritesheet.png` is defined in `SPRITES` but not used on the homepage — used on ProjectsPage for the project-jump interaction
@@ -81,10 +93,10 @@ train-entering → train-stopped → doors-opening → robot-exiting → doors-c
 
 Flow:
 
-1. **Train entry** — train slides in from left (`trainX: -100 → -55`, same easing as HomePage arrival), carrying the robot (robot hidden during entry — it's "inside" the train).
-2. **Doors open + idle robot** — `setDoorsOpen(true)` triggers the 0.7s panel slide. Robot is placed at door center in `idle` pose, raised 26px (so it appears to stand on the train floor), with `.train-container` inline `zIndex: 20` lifting it above `.scene` (z 6) so closed doors hide the robot during the slide.
+1. **Train entry** — train slides in from left (`trainX: -TRAIN_WIDTH_VW → -77`, same easing as HomePage arrival), carrying the robot (robot hidden during entry — it's "inside" the train).
+2. **Doors open + idle robot** — `setDoorsOpen(true)` triggers the 0.7s panel slide. Robot is placed at door center in `idle` pose, raised `31px * uiScale` (so it appears to stand on the train floor), with `.train-container` inline `zIndex: 20` lifting it above `.scene` (z 6) so closed doors hide the robot during the slide.
 3. **Pause + transition** — after doors finish (700ms), train z drops back to 5 (so robot is now visibly in front), then 500ms idle pause for the standing animation.
-4. **Disembark walk** — `runRight` animation, robot's px offsets lerp from `(0, -26)` to `(40, 0)` over 1.5s (steps right 40px and down 26px to land on the platform). On free-roam entry, `robotDxPx` is converted to vw and baked into `robotX` to avoid a visual snap.
+4. **Disembark walk** — `runRight` animation, robot's px offsets lerp from `(0, -31 * uiScale)` to `(40 * uiScale, 0)` over 1.5s (steps right ~40px and down ~31px to land on the platform). On free-roam entry, `robotDxPx` is converted to vw and baked into `robotX` to avoid a visual snap.
 5. **Doors close → train departs** — doors close (`.open` class removed, 0.7s transition), then train slides off-screen right at constant 45%/s.
 6. **Title fade** — in parallel with the train leaving, `"Welcome to Xiangpeng's personal projects"` fades in (PuHuiTi 80px / `clamp(2.5rem, 4.2vw, 5rem)`, 0.9s transition), holds ~1.8s, fades out.
 7. **Project cards appear** — 5 cards (01–05) positioned along a scene wider than viewport (`SCENE_WIDTH_VW = 300`) fade in together via `.projects-row.visible`. Plus a `.to-be-continued` overlay (robot+sign+cone composite at `xVw=265`) at scene end.
