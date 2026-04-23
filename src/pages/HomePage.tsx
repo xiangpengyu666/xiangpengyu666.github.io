@@ -17,11 +17,26 @@ type Phase =
   ;
 
 const DEST_ROUTES: Record<string, string> = {
-  Projects: '/projects',
+  'Personal Projects': '/projects',
+  'Work Projects': '/work',
   Gallery: '/gallery',
   Blog: '/blog',
   Contact: '/contact',
 };
+
+type MainDest = { label: string; icon: string; desc: string; sub?: boolean };
+const MAIN_DESTS: MainDest[] = [
+  { label: 'Projects', icon: '🔧', desc: 'Personal · Work', sub: true },
+  { label: 'Gallery', icon: '📷', desc: 'Photography' },
+  { label: 'Blog', icon: '✍️', desc: 'Writing & Thoughts' },
+  { label: 'Contact', icon: '✉️', desc: "Let's connect" },
+];
+
+type ProjectsSubDest = { label: string; icon: string; desc: string };
+const PROJECTS_SUB_DESTS: ProjectsSubDest[] = [
+  { label: 'Personal Projects', icon: '🧑‍🎨', desc: 'Industrial · Game · IoT' },
+  { label: 'Work Projects', icon: '💼', desc: 'Ulanzi & beyond' },
+];
 
 type RobotAnim = 'idle' | 'greeting' | 'turnLeft' | 'runLeft' | 'turnRight' | 'runRight' | 'jump' | 'boardTrain';
 
@@ -41,6 +56,7 @@ export default function HomePage() {
   const [doorsOpen, setDoorsOpen] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [showDestination, setShowDestination] = useState(false);
+  const [destMenu, setDestMenu] = useState<'main' | 'projects'>('main');
   const [pendingRoute, setPendingRoute] = useState<string | null>(null);
   const navigate = useNavigate();
   const keysRef = useRef<Set<string>>(new Set());
@@ -236,6 +252,7 @@ export default function HomePage() {
   const onBoardComplete = useCallback(() => {
     setDoorsOpen(false); // door slides right (back to closed)
     setTimeout(() => {
+      setDestMenu('main');
       setShowDestination(true);
       setPhase('destination');
     }, 800); // wait for door close animation (0.7s) + small buffer
@@ -376,30 +393,61 @@ export default function HomePage() {
       {showDestination && (
         <div className="destination-overlay">
           <div className="destination-modal">
-            <h2>Where to?</h2>
-            <p className="destination-sub">Select your destination</p>
-            <div className="destination-options">
-              {[
-                { label: 'Projects', icon: '🔧', desc: 'Work · Personal · GIX' },
-                { label: 'Gallery', icon: '📷', desc: 'Photography' },
-                { label: 'Blog', icon: '✍️', desc: 'Writing & Thoughts' },
-                { label: 'Contact', icon: '✉️', desc: "Let's connect" },
-              ].map(dest => (
+            {destMenu === 'main' ? (
+              <>
+                <h2>Where to?</h2>
+                <p className="destination-sub">Select your destination</p>
+                <div className="destination-options">
+                  {MAIN_DESTS.map(dest => (
+                    <button
+                      key={dest.label}
+                      className="destination-btn"
+                      onClick={() => {
+                        if (dest.sub) {
+                          setDestMenu('projects');
+                          return;
+                        }
+                        setPendingRoute(DEST_ROUTES[dest.label] ?? '/');
+                        setShowDestination(false);
+                        setPhase('departing');
+                      }}
+                    >
+                      <span className="dest-icon">{dest.icon}</span>
+                      <span className="dest-label">{dest.label}</span>
+                      <span className="dest-desc">{dest.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <h2>Which projects?</h2>
+                <p className="destination-sub">Personal or work</p>
+                <div className="destination-options">
+                  {PROJECTS_SUB_DESTS.map(dest => (
+                    <button
+                      key={dest.label}
+                      className="destination-btn"
+                      onClick={() => {
+                        setPendingRoute(DEST_ROUTES[dest.label] ?? '/');
+                        setShowDestination(false);
+                        setPhase('departing');
+                      }}
+                    >
+                      <span className="dest-icon">{dest.icon}</span>
+                      <span className="dest-label">{dest.label}</span>
+                      <span className="dest-desc">{dest.desc}</span>
+                    </button>
+                  ))}
+                </div>
                 <button
-                  key={dest.label}
-                  className="destination-btn"
-                  onClick={() => {
-                    setPendingRoute(DEST_ROUTES[dest.label] ?? '/');
-                    setShowDestination(false);
-                    setPhase('departing');
-                  }}
+                  className="destination-back"
+                  onClick={() => setDestMenu('main')}
                 >
-                  <span className="dest-icon">{dest.icon}</span>
-                  <span className="dest-label">{dest.label}</span>
-                  <span className="dest-desc">{dest.desc}</span>
+                  ← Back
                 </button>
-              ))}
-            </div>
+              </>
+            )}
           </div>
         </div>
       )}

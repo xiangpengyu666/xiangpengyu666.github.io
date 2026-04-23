@@ -170,7 +170,7 @@
 /* ═══ To Be Continued sign at end of scene ═══ */
 .to-be-continued {
   position: absolute;
-  transform: translate(calc(-50% + 40px * var(--ui-scale)), calc(55px * var(--ui-scale)));
+  transform: translate(calc(-50% + 90px * var(--ui-scale)), calc(65px * var(--ui-scale)));
   pointer-events: none;
   z-index: 4;
   opacity: 0;
@@ -182,7 +182,7 @@
 }
 
 .to-be-continued img {
-  height: 60vh;
+  height: 79.35vh; /* 60vh × 1.15 × 1.15 */
   width: auto;
   display: block;
 }

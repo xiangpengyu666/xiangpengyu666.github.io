@@ -333,3 +333,20 @@
   color: var(--text-muted);
   letter-spacing: 0.05em;
 }
+
+.destination-back {
+  margin-top: 1.5rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.4rem 0.8rem;
+  letter-spacing: 0.05em;
+  transition: color 0.2s ease;
+}
+
+.destination-back:hover {
+  color: var(--text);
+}

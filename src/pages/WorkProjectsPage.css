@@ -1,0 +1,15 @@
+/* WorkProjectsPage reuses ProjectsPage styles except for:
+   - Square card thumb (Ulanzi product images are 1:1 in Figma)
+   - Thumb shrunk to 75% of the card width (title/desc stay full-width) */
+.work-projects-page .project-thumb {
+  aspect-ratio: 1 / 1;
+  width: 76.073%; /* 70% × 1.15 × 0.9 × 1.05 */
+  /* Left-align so the image's left edge matches the title below it. */
+  margin-left: 0;
+  margin-right: auto;
+}
+
+/* Product names are grey on the work page (per Figma), not black. */
+.work-projects-page .project-title {
+  color: #808080;
+}
