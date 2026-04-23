@@ -28,7 +28,9 @@ idle-start → greeting → free-roam → train-arriving → train-stopped → d
 
 - The robot character is positioned with `robotX` (% from left), sitting on the platform at `PLATFORM_Y = 88%`.
 - Keyboard input (`←/→` or `a/d`) is captured via a ref-based `Set<string>` to avoid re-render lag; movement runs in a `requestAnimationFrame` loop.
-- The train slides in via its own rAF loop (ease-out lerp); `trainX` starts at `-TRAIN_WIDTH_VW` (fully off-screen left) and stops at `-77%`, which puts the door center at ~17% of the viewport. Train width = `calc(95vw * var(--train-scale))` — `TRAIN_SCALE = 1.25` in both TS and CSS (keep in sync). The train is also nudged down by `5px * uiScale` (inline style) to sit a touch below the platform line.
+- The train slides in via its own rAF loop (ease-out lerp, `diff * 0.02` — halved from the original 0.04 for a more leisurely pull-in ~4s); `trainX` starts at `-TRAIN_WIDTH_VW` (fully off-screen left) and stops at `-77%`, which puts the door center at ~17% of the viewport. Train width = `calc(95vw * var(--train-scale))` — `TRAIN_SCALE = 1.25` in both TS and CSS (keep in sync). The train is also nudged down by `5px * uiScale` (inline style) to sit a touch below the platform line.
+- Train arrival happens **after** greeting completes (serial flow): `greeting → free-roam (500ms) → train-arriving → train-stopped (800ms) → doors-open`. A past revision tried running them in parallel — reverted so the user actually watches the greeting before the train shows up.
+- Auto-walk to door (during `boarding` phase, both from Space key and nav-dropdown intercept) uses **constant speed 18%/sec**, not ease-out lerp — large distances look like walking, not teleporting.
 - The door overlay (`.train-doors`) aligns to the rightmost (door-less) entrance in `Final_train.png`. **Double sliding doors**: two `door_panel_v3.png` panels (right one mirrored via `scaleX(-1)`) sit closed during arrival to match the closed doors painted at the train's other entrances; on `.open` they slide outward (left panel left, right panel right). After the boarding animation completes, `setDoorsOpen(false)` closes them before the destination modal appears.
 - **Door positioning is pixel-tuned to `Final_train.png` (4096×808, aspect 5.07:1) — do not "clean up" without re-aligning visually**. All offsets are `vw * var(--train-scale)` so they scale *with the train* (not with `--ui-scale`, which is dampened on large screens):
   - `.train-doors { left: 80%; top: calc(24% + 1.471vw * var(--train-scale)); width: 6.3%; height: calc(49.5% + 2.153vw * var(--train-scale)); }` (overlay box on the train)
@@ -38,12 +40,44 @@ idle-start → greeting → free-roam → train-arriving → train-stopped → d
   - Why vw, not px×ui-scale? Doors must track the train (sized in vw). With linear ui-scale it worked, but once ui-scale got dampened on big screens, doors shrank slower than the train. Switching to vw pins them to the train's actual rendered size.
   - Base-unit convention: to tune by N screen pixels at 1440px viewport, convert via `N / 14.4` vw in the base value (e.g. top was nudged +6px → +0.417vw into the 1.471 figure).
 - Space-to-board is gated: robot must be within 6% of `getDoorCenterPercent()` (`trainX + 0.835 * TRAIN_WIDTH_VW`, i.e. door center as % of viewport width).
-- Above the station scene, `<header className="site-header">` (Xp logo + nav) and `<section className="welcome">` (intro text) are absolutely positioned overlays.
+- Above the station scene, `<SiteHeader />` (Xp logo + nav, see *Shared nav* below) and `<section className="welcome">` (intro text) are absolutely positioned overlays.
+- Welcome text: three lines (`<h1>`, `<h1>`, `<p>`) with **staggered fade-in**, total 5s. `animation: welcomeFadeIn 1.467s`, delays `0.2s / 1.867s / 3.533s` — each line fully fades in (1.467s), 0.2s pause, then next line starts. `Hi!` wrapped in `<span className="welcome-hi">` rendered at `2em` with `translateY(-10px * var(--ui-scale))` for baseline balance. Section position: `top: calc(18% + 5px * var(--ui-scale))`.
 - **Boarding close: robot vanishes via z-index trick, not opacity/conditional render**:
   - During `phase === 'boarding' && !doorsOpen`, robot's inline `zIndex: 1` drops it BELOW `.train-body` (z-index: 4 in CSS), so the opaque train PNG instantly hides the entire robot.
   - In the same condition, `.train-doors` inline `zIndex: 30` lifts the door panels above robot/hint-bubble so the closing animation reads as "doors covering the robot".
   - This works because `.train-container` intentionally has NO z-index → no stacking context → its child `.train-doors`'s z-index escapes to compete with the robot's z at the page root.
   - **Don't try to "fix" this with opacity transitions or DOM removal** — earlier attempts hit a CSS rabbit hole (door PNG has transparent edges, `transform` on `.scene`/robot creates stacking contexts that trap z-index, etc.). The z=1 trick works.
+
+### Destination modal (HomePage)
+
+Once the board animation completes (or nav intercept fires — see *Shared nav* below), the user chooses where the train heads next.
+
+- **Two-level modal**. State `destMenu: 'main' | 'projects'`:
+  - Main menu: `Projects (dropdown) / Gallery / Blog / Contact`. Projects is the only one with `sub: true` — clicking it switches `destMenu` to `'projects'` instead of departing.
+  - Projects submenu: `Personal Projects (/projects)` / `Work Projects (/work)` + a `← Back` button to return to main.
+- `destMenu` is reset to `'main'` every time `setShowDestination(true)` fires (in `onBoardComplete`), so a re-arrival always starts at the top.
+- Route mapping: `DEST_ROUTES` dict — keys are label strings, values are paths. `'Personal Projects' → '/projects'`, `'Work Projects' → '/work'`, `Gallery/Blog/Contact` → `/gallery / /blog / /contact` (those routes still don't exist, navigating there shows blank).
+- If `pendingRoute` is already set when the board animation completes (set by nav-dropdown intercept, see *Shared nav*), `onBoardComplete` skips the modal and jumps straight to `departing`.
+
+### Shared nav (`src/components/SiteHeader.tsx`)
+
+Used by HomePage / ProjectsPage / WorkProjectsPage — replaces the inline `<header>` that used to live in each page. Single source of truth.
+
+- `Xp` logo → `<Link to="/">`. Hover: opacity 0.6 + `scale(1.05)`, transform-origin left.
+- Projects nav entry is a **hover/focus CSS dropdown** with two items (Personal → `/projects`, Work → `/work`). Structure is two-layered to avoid the "dead zone" hover-drop bug:
+  - Outer `.nav-dropdown-menu` is transparent with `padding-top` creating the hover bridge from trigger to panel.
+  - Inner `.nav-dropdown-panel` is the actual white rounded card.
+  - The mouse never leaves `.nav-dropdown` while crossing from trigger down into the menu, so `:hover` stays sticky. **Don't add a `margin-top` gap, it re-introduces the bug.**
+- `:focus-within` support for keyboard accessibility.
+- `onDestinationSelect?: (path) => boolean` prop: when a caller supplies this and it returns `true`, the Link's click is `preventDefault()`d so the caller can run its own animation. HomePage uses this to trigger the full boarding sequence when `phase === 'doors-open'`:
+  ```ts
+  onDestinationSelect={(path) => {
+    if (phase !== 'doors-open') return false;
+    setPendingRoute(path); setShowHint(false); setPhase('boarding');
+    return true;
+  }}
+  ```
+- All four nav destinations (About / Personal / Work / Blog / Contact) go through the same intercept — the flow is consistent regardless of which one the user picks. About/Blog/Contact have no page yet; train still plays out, navigation lands on empty route.
 
 ### SpriteAnimator
 
@@ -67,8 +101,9 @@ The interactive scenes are scaled by a single factor `--ui-scale` injected as a 
 
 - `src/Spritesheet/` — sprite sheet PNGs, imported directly via Vite in `SpriteAnimator.tsx` (hashed at build time)
 - `public/sprites/` — train and door images only (`Final_train.png` 4096×808, `door_panel_v3.png` 290×998 with alpha), referenced by URL string in `HomePage.tsx` / `ProjectsPage.tsx` via `${import.meta.env.BASE_URL}sprites/...` (so gh-pages subpaths work). The door PNG **has transparent edges** — never assume opaque coverage. Filename casing matters — gh-pages is case-sensitive.
-- `public/projects/` — 5 project covers + `to-be-continued.webp` (Figma exports, ~360 KB total after compression)
-- `scripts/compress-projects.mjs` — sharp-based one-shot script to convert `public/projects/*.png` → `*.webp` (width 1200, quality 80). Run via `node scripts/compress-projects.mjs` after dropping in new PNGs from Figma.
+- `public/projects/` — 5 personal project covers + `to-be-continued.webp` (Figma exports, ~360 KB total after compression)
+- `public/work/` — 3 Ulanzi product WebPs for the work projects page (~128 KB total)
+- `scripts/compress-projects.mjs` — sharp-based one-shot script to convert `public/projects/*.png` → `*.webp` (width 1200, quality 80). Run via `node scripts/compress-projects.mjs` after dropping in new PNGs from Figma. The work-page assets were compressed with the same parameters but inline (no dedicated script).
 - `jump_spritesheet.png` is defined in `SPRITES` but not used on the homepage — used on ProjectsPage for the project-jump interaction
 - `public/bg.png` is **no longer referenced** — homepage background is plain white and the logo / nav / intro text are HTML
 
@@ -111,10 +146,24 @@ Key coordinates:
 - Robot baseline is `bottom: calc(${100 - PLATFORM_Y}% - 3px)` (3px below platform line) — Projects-page-only fine-tune, doesn't apply to train/cards.
 
 Card layout (matches Figma Desk-3/4):
-- Each `.project-card` width 27vw (max 540px), `transform: translateX(-50%) scale(1.2)` with `transform-origin: top center`
-- `.projects-row` top: `calc(25% - 120px)`
+- Each `.project-card` width 27vw (no max-width cap — removed during responsive-scaling fix), `transform: translateX(-50%) scale(1.2)` with `transform-origin: top center`
+- `.projects-row` top: `calc(25% - 120px * var(--ui-scale))`
 - Number 48px PuHuiTi Regular `#808080`; title 24px PuHuiTi SemiBold black; subtitle 24px PuHuiTi Regular `#808080`
 - Thumbnail aspect-ratio `527 / 386`, `object-fit: cover`
+
+### Work Projects page — `WorkProjectsPage.tsx` (route: `/work`)
+
+Copy of `ProjectsPage`, diverged by configuration rather than abstracted (was judged too early to extract a shared scene component). CSS reuses `ProjectsPage.css` entirely and overrides just the handful of differences via `.work-projects-page` prefix in `WorkProjectsPage.css`.
+
+Differences from Personal Projects:
+- **3 cards** (Ulanzi products) instead of 5, titles in `#808080` grey (Figma spec). **No `desc` field / line** under the product name — just the title.
+- Card thumb is **square** (`aspect-ratio: 1/1`), shrunk to `76.073% width` of the card and **left-aligned** (`margin-left: 0`) so the image's left edge matches the title below.
+- Per-card `objectPosition` (inline style on `<img>`) replicates non-center Figma crops for portrait source images: `01: center 70%`, `02: center center`, `03: center 8%`.
+- `SCENE_WIDTH_VW = 192.639`, cards at `xVw: 30 / 72.292 / 114.584` (42.292vw apart — tighter than personal's 47.5vw), `TO_BE_CONTINUED_X_VW = 158.542`.
+- Assets: `public/work/01-quick-release-clip.webp`, `02-camera-clamp.webp`, `03-sd-reader.webp` — downloaded from Figma `132:453 / :454 / :455` and WebP-compressed inline via a sharp one-liner (no dedicated script).
+- Same shared to-be-continued sign/asset as personal page — but the sign was bumped up 32% relative to the original 60vh (`height: 79.35vh`) and its translate nudge is `+90px / +65px * ui-scale`.
+
+Routing: user on HomePage → destination modal → Projects → Work Projects → `/work`. Click flow also available via the Projects nav-dropdown (`Work` item).
 
 ### Figma integration
 
@@ -122,6 +171,6 @@ Card layout (matches Figma Desk-3/4):
 - The `claude.ai Figma` MCP (remote) can do `get_screenshot` and `get_metadata` with explicit nodeId/fileKey. `get_design_context` (the rich version that returns React+Tailwind reference code, asset URLs, design tokens) requires a layer to be **selected in Figma desktop** — when calling it, ask the user to select the target frame first.
 - Asset URLs returned by `get_design_context` (e.g. `https://www.figma.com/api/mcp/asset/...`) expire after **7 days** — download immediately, then run `node scripts/compress-projects.mjs` to convert to WebP.
 
-### Planned pages (stubs in destination modal)
+### Planned pages (stubs in destination modal + nav)
 
-Gallery, Blog, Contact — navigation from the destination modal still points to `/gallery`, `/blog`, `/contact` but those routes do not exist yet.
+`/about`, `/gallery`, `/blog`, `/contact` — both the destination modal and the nav dropdown's non-Projects items route there, but the routes aren't registered in `App.tsx` yet. Clicking them plays the full boarding animation and then lands on a blank screen. When building these pages, register them in `App.tsx` alongside the existing `/`, `/projects`, `/work`.
