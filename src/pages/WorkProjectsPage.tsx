@@ -2,8 +2,18 @@ import { useState, useEffect, useRef, useCallback, type CSSProperties } from 're
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
 import SiteHeader from '../components/SiteHeader';
 import useUiScale from '../hooks/useUiScale';
+import ProjectDetailModal from '../components/ProjectDetailModal';
+import QuickReleaseClipDetail from '../projects/quick-release-clip/QuickReleaseClipDetail';
+import CameraClampDetail from '../projects/camera-clamp/CameraClampDetail';
+import SdReaderDetail from '../projects/sd-reader/SdReaderDetail';
 import './ProjectsPage.css';
 import './WorkProjectsPage.css';
+
+const DETAIL_COMPONENTS: Record<string, () => JSX.Element> = {
+  '01': QuickReleaseClipDetail,
+  '02': CameraClampDetail,
+  '03': SdReaderDetail,
+};
 
 type Phase =
   | 'train-entering'   // train slides in from left (carrying robot)
@@ -437,21 +447,22 @@ export default function WorkProjectsPage() {
         </div>
       )}
 
-      {/* Project detail modal */}
-      {activeProject && phase === 'project-detail' && (
-        <div
-          className="project-modal-overlay"
-          onClick={() => { setActiveProject(null); setPhase('free-roam'); }}
-        >
-          <div className="project-modal" onClick={e => e.stopPropagation()}>
-            <div className="project-modal-number">{activeProject.id}</div>
-            <h2>{activeProject.title}</h2>
-            <button onClick={() => { setActiveProject(null); setPhase('free-roam'); }}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Project detail — shared Behance-style modal + per-project slide stack */}
+      {activeProject && phase === 'project-detail' && (() => {
+        const Detail = DETAIL_COMPONENTS[activeProject.id];
+        return (
+          <ProjectDetailModal
+            open={true}
+            onClose={() => { setActiveProject(null); setPhase('free-roam'); }}
+          >
+            {Detail ? <Detail /> : (
+              <div style={{ padding: '80px 40px', textAlign: 'center' }}>
+                <h2>{activeProject.title}</h2>
+              </div>
+            )}
+          </ProjectDetailModal>
+        );
+      })()}
     </div>
   );
 }

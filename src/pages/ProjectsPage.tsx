@@ -1,6 +1,21 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
 import SiteHeader from '../components/SiteHeader';
+import ProjectDetailModal from '../components/ProjectDetailModal';
+import TeethDefenderDetail from '../projects/teeth-defender/TeethDefenderDetail';
+import FMouseDetail from '../projects/f-mouse/FMouseDetail';
+import EchoWaveDetail from '../projects/echowave/EchoWaveDetail';
+import IceGleamDetail from '../projects/icegleam/IceGleamDetail';
+import PuppyPoopLoopDetail from '../projects/puppy-poop-loop/PuppyPoopLoopDetail';
+
+// Map each project id to its dedicated detail component.
+const DETAIL_COMPONENTS: Record<string, () => JSX.Element> = {
+  '01': TeethDefenderDetail,
+  '02': FMouseDetail,
+  '03': EchoWaveDetail,
+  '04': IceGleamDetail,
+  '05': PuppyPoopLoopDetail,
+};
 import useUiScale from '../hooks/useUiScale';
 import './ProjectsPage.css';
 
@@ -435,22 +450,25 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Project detail modal */}
-      {activeProject && phase === 'project-detail' && (
-        <div
-          className="project-modal-overlay"
-          onClick={() => { setActiveProject(null); setPhase('free-roam'); }}
-        >
-          <div className="project-modal" onClick={e => e.stopPropagation()}>
-            <div className="project-modal-number">{activeProject.id}</div>
-            <h2>{activeProject.title}</h2>
-            <p>{activeProject.desc}</p>
-            <button onClick={() => { setActiveProject(null); setPhase('free-roam'); }}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Project detail — each project has its own slide stack. Scaffolded
+          projects without slides yet show a "coming soon" placeholder inside
+          the same modal shell. */}
+      {activeProject && phase === 'project-detail' && (() => {
+        const Detail = DETAIL_COMPONENTS[activeProject.id];
+        return (
+          <ProjectDetailModal
+            open={true}
+            onClose={() => { setActiveProject(null); setPhase('free-roam'); }}
+          >
+            {Detail ? <Detail /> : (
+              <div style={{ padding: '80px 40px', textAlign: 'center' }}>
+                <h2>{activeProject.title}</h2>
+                <p>{activeProject.desc}</p>
+              </div>
+            )}
+          </ProjectDetailModal>
+        );
+      })()}
     </div>
   );
 }

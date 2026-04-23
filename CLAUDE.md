@@ -171,6 +171,45 @@ Routing: user on HomePage → destination modal → Projects → Work Projects �
 - The `claude.ai Figma` MCP (remote) can do `get_screenshot` and `get_metadata` with explicit nodeId/fileKey. `get_design_context` (the rich version that returns React+Tailwind reference code, asset URLs, design tokens) requires a layer to be **selected in Figma desktop** — when calling it, ask the user to select the target frame first.
 - Asset URLs returned by `get_design_context` (e.g. `https://www.figma.com/api/mcp/asset/...`) expire after **7 days** — download immediately, then run `node scripts/compress-projects.mjs` to convert to WebP.
 
+### Project detail modals — `ProjectDetailModal` + per-project slide stacks
+
+When the robot "jumps" at a project card (on both ProjectsPage and WorkProjectsPage), a Behance-style modal opens with a long scroll of Figma-exported slides. Implementation:
+
+- **`src/components/ProjectDetailModal.tsx` / `.css`** — shared modal shell. Full-viewport dim+blur overlay, centered white card container, Apple "Liquid Glass" close (top-right) and width (top-left, `−` / `%` / `+`) controls. Controls are rendered OUTSIDE the overlay DOM (as Fragment siblings) so their `position: fixed` anchors to the viewport, not to overlay (which has `backdrop-filter` → would otherwise become the containing block).
+  - **Default width = `min(1650px, viewport × 0.67)`** — the "100%" reset value is viewport-proportional so the modal is ≈2/3 of any screen, never fills it.
+  - **Min/Max also viewport-derived**: min = `max(240, vw × 0.32)`, max = `min(2400, vw × 0.92)`. Prevents the ± buttons from pushing the modal off-screen on small viewports.
+  - **`--pdm-scale` CSS variable** is written to `document.documentElement` while modal is open, tracking `(currentModalWidth / baselineModalWidth)`. Every px in the close/zoom chrome (button sizes, positions, padding, shadow offsets) is `calc(N * var(--pdm-scale))`, all additionally shrunk by `CHROME_SHRINK = 1.5`. Buttons scale linearly below 1440 viewport, cap at the same width cap as the modal itself (`(1650 / 965) ≈ 1.71×`).
+  - **Resize sync**: a resize listener recomputes pdm-scale + defaultWidth + min/max and snaps the current width back to default, so the modal continuously tracks the viewport as the user drags the browser.
+- **`src/projects/_shared/ProjectSlideStack.tsx` / `ProjectDetail.css`** — single generic slide-list component. Takes `{ slug, basePath?, slides }`. Builds URLs as `${BASE}${basePath}/${slug}/slides/${file}` (default `basePath = 'projects'`; pass `'work'` for Ulanzi work projects). Uses IntersectionObserver to add `.is-visible` class per slide → CSS `.pd-anim` fade-up animation.
+- **Slide image sizing**: `.pd-slide-img img { width: 100%; height: auto }` — the image's natural 16:9 aspect drives the figure height. Don't use CSS `aspect-ratio` on the figure — in some contexts it fails silently and `object-fit: contain` on height-100% img looks cropped.
+- **Per-project Detail components** (thin wrappers): `src/projects/<slug>/<Name>Detail.tsx` each exports a default React component that calls `<ProjectSlideStack slug="..." slides={SLIDES} />`. The `SLIDES` array is the single source of truth for slide filenames + alt text + display order.
+- **Routing**: `ProjectsPage` and `WorkProjectsPage` each have a `DETAIL_COMPONENTS` map from project id to component. On `phase === 'project-detail'`, they render `<ProjectDetailModal>` with the mapped Detail inside. Fallback: if no Detail found, modal shows a placeholder with project title/desc.
+
+### Project slide asset pipeline
+
+Each project's slides live at `public/<projects|work>/<slug>/slides/NN.webp`, named sequentially from `01` in Figma display order.
+
+**Exporting + importing a new project's slides**:
+1. In Figma desktop, select the project's column of `Slide 16:9 - N` frames
+2. Export as PNG at 3× (yields ~3174×1785 per slide)
+3. Drop all PNGs into the project's `public/**/<slug>/slides/` folder
+4. `node scripts/rename-slides.mjs` — renames Figma default names to `01.png`, `02.png`, … using natural sort (or the hardcoded `EXPLICIT_ORDER` map for projects where Figma's frame naming doesn't match display order). ⚠ On Windows, EXPLICIT_ORDER keys must use backslash paths or the lookup falls through to auto-sort — keep an eye on this.
+5. `node scripts/compress-slides.mjs` — walks all `public/{projects,work}/*/slides/`, converts PNG → WebP q=88, deletes the PNG. Idempotent, safe to rerun.
+6. Optional: if Figma natural sort didn't match display order, edit `scripts/fix-slide-order.mjs` with an order map (`{ 'public/.../slides': [newIdx→currentIdx] }`) and run it once. The initial 57-slide pass used this.
+7. Update `SLIDES` array in the project's `<Name>Detail.tsx` — usually just `Array.from({ length: N }, ...)` since the filesystem names are now in correct display order.
+
+**How the Figma display order was derived** (for the initial batch): fetched `get_metadata` on the overview canvas (node `133:460`) which includes all projects' slides laid out in columns. Extracted `(x, y)` coords for every `Slide 16:9 - N` frame, grouped by x (= project column), sorted by y ascending (= display order). Saved as a 57-row table which drove `scripts/fix-slide-order.mjs`.
+
 ### Planned pages (stubs in destination modal + nav)
 
 `/about`, `/gallery`, `/blog`, `/contact` — both the destination modal and the nav dropdown's non-Projects items route there, but the routes aren't registered in `App.tsx` yet. Clicking them plays the full boarding animation and then lands on a blank screen. When building these pages, register them in `App.tsx` alongside the existing `/`, `/projects`, `/work`.
+
+### ⚠ TODO — remind the user next session
+
+**Video embedding**: The current project detail modals are pure image stacks (PNG → WebP slides). Some of the Figma slides clearly reference video content (user flow demos, UI walkthroughs) that was presumably played from separate assets in the original pitch deck. Next time Xiangpeng opens the repo, proactively raise this:
+- Which projects need video instead of static slides? (Likely Teeth Defender game Chapter 01/02 flows, EchoWave RV Tracking demos, maybe others)
+- Where are the videos hosted? (YouTube? Vimeo? Raw .mp4 in `public/`?)
+- How should they embed? Options: inline `<video autoplay muted loop>` in the slide list between `<img>` figures; hover-to-play thumbnails; click-to-open lightbox.
+- Update `Slide` type in `ProjectSlideStack.tsx` to support `{ type: 'image' | 'video', src, poster?, ... }` so each project's `SLIDES` array can mix.
+
+Don't wait for the user to ask — mention this on first message next session.

@@ -1,0 +1,171 @@
+/* ═══ Behance-style project detail modal ═══
+   All px values multiply by --pdm-scale (set on <html> by the modal component
+   while open) so the whole UI — container width, buttons, padding, shadows,
+   type — shrinks on small screens and grows on large ones. Falls back to 1. */
+
+.project-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 30, 40, 0.78);
+  backdrop-filter: blur(10px);
+  z-index: 200;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  animation: pdm-fade 0.3s ease both;
+  padding:
+    calc(48px * var(--pdm-scale, 1))
+    calc(24px * var(--pdm-scale, 1));
+}
+
+@keyframes pdm-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.project-detail-container {
+  position: relative;
+  width: 100%;
+  /* --pdm-width is already viewport-proportional (set by JS to ≈67vw capped
+     at 1650px). Don't multiply by --pdm-scale here, or small screens would
+     shrink the modal twice. Cap below viewport for a safety net. */
+  max-width: min(
+    var(--pdm-width, 1650px),
+    calc(100vw - 32px)
+  );
+  margin: 0 auto;
+  background: #fff;
+  border-radius: calc(16px * var(--pdm-scale, 1));
+  box-shadow:
+    0
+    calc(24px * var(--pdm-scale, 1))
+    calc(80px * var(--pdm-scale, 1))
+    rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  transition: max-width 0.25s ease;
+  animation: pdm-rise 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+@keyframes pdm-rise {
+  from { opacity: 0; transform: translateY(24px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* ═══ Close button (top-right, fixed to viewport, scrolls with viewport) ═══ */
+
+.project-detail-close {
+  position: fixed;
+  top: calc(24px * var(--pdm-scale, 1));
+  right: calc(32px * var(--pdm-scale, 1));
+  z-index: 210;
+  width: calc(66px * var(--pdm-scale, 1));
+  height: calc(66px * var(--pdm-scale, 1));
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.78) 0%,
+      rgba(255, 255, 255, 0.52) 100%
+    );
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  color: #1a1a1a;
+  font-size: calc(40px * var(--pdm-scale, 1));
+  line-height: 1;
+  font-family: var(--font-body);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 calc(10px * var(--pdm-scale, 1)) calc(30px * var(--pdm-scale, 1)) rgba(0, 0, 0, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.15);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.project-detail-close:hover {
+  transform: scale(1.08);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.68) 100%
+    );
+}
+
+/* ═══ Width control (top-left, fixed to viewport) ═══ */
+
+.project-detail-zoom {
+  position: fixed;
+  top: calc(24px * var(--pdm-scale, 1));
+  left: calc(32px * var(--pdm-scale, 1));
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  gap: calc(3px * var(--pdm-scale, 1));
+  padding: calc(6px * var(--pdm-scale, 1));
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.78) 0%,
+      rgba(255, 255, 255, 0.52) 100%
+    );
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: calc(33px * var(--pdm-scale, 1));
+  box-shadow:
+    0 calc(10px * var(--pdm-scale, 1)) calc(30px * var(--pdm-scale, 1)) rgba(0, 0, 0, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.15);
+  font-family: var(--font-body);
+}
+
+.pdm-zoom-btn,
+.pdm-zoom-reset {
+  border: none;
+  background: transparent;
+  color: #1a1a1a;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pdm-zoom-btn {
+  width: calc(54px * var(--pdm-scale, 1));
+  height: calc(54px * var(--pdm-scale, 1));
+  border-radius: 50%;
+  font-size: calc(30px * var(--pdm-scale, 1));
+  line-height: 1;
+  font-weight: 500;
+}
+
+.pdm-zoom-btn:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.pdm-zoom-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pdm-zoom-reset {
+  min-width: calc(78px * var(--pdm-scale, 1));
+  height: calc(54px * var(--pdm-scale, 1));
+  padding: 0 calc(15px * var(--pdm-scale, 1));
+  border-radius: calc(27px * var(--pdm-scale, 1));
+  font-size: calc(19px * var(--pdm-scale, 1));
+  font-weight: 500;
+  color: #606060;
+}
+
+.pdm-zoom-reset:hover {
+  background: rgba(255, 255, 255, 0.55);
+  color: #1a1a1a;
+}

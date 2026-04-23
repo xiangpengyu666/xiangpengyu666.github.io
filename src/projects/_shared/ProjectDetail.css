@@ -1,0 +1,59 @@
+/* Shared styling for every project detail body — a long-scroll list of slide
+   images. Each project's Detail.tsx just maps its slide array into <figure>s
+   with class pd-slide-img. ProjectDetailModal handles the chrome around it. */
+
+.pd-root {
+  width: 100%;
+  background: #fff;
+}
+
+.pd-slide-img {
+  margin: 0;
+  display: block;
+  width: 100%;
+  background: #fafafa;
+}
+
+.pd-slide-img img {
+  display: block;
+  width: 100%;
+  height: auto;  /* Natural aspect of the PNG drives figure height — no cropping */
+}
+
+/* ═══ Scroll-triggered fade-up (added by IntersectionObserver) ═══ */
+.pd-anim {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: opacity, transform;
+}
+
+.pd-anim.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Placeholder shown when a project is scaffolded but has no slides yet */
+.pd-empty {
+  min-height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  color: #888;
+  text-align: center;
+}
+.pd-empty-msg p {
+  margin: 0.4em 0;
+}
+.pd-empty-msg .pd-empty-hint {
+  font-size: 0.9em;
+}
+.pd-empty-msg code {
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
