@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
+import SiteHeader from '../components/SiteHeader';
 import useUiScale from '../hooks/useUiScale';
 import './HomePage.css';
 
@@ -62,7 +63,6 @@ export default function HomePage() {
   const keysRef = useRef<Set<string>>(new Set());
   const frameLoopRef = useRef<number>(0);
   const trainAnimRef = useRef<number>(0);
-
   // Phase 1: Start with idle, then trigger greeting after 1s
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -72,29 +72,25 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Greeting complete -> free roam + train arrives
+  // Greeting complete → free-roam briefly, then train starts arriving.
   const onGreetingComplete = useCallback(() => {
     setRobotAnim('idle');
     setPhase('free-roam');
-    // Start train arrival after a short delay
-    setTimeout(() => {
-      setPhase('train-arriving');
-    }, 500);
+    setTimeout(() => setPhase('train-arriving'), 500);
   }, []);
 
-  // Train arrival animation
+  // Train arrival — only after greeting finishes. Speed factor 0.02 (half of
+  // the original 0.04) for a more leisurely pull-in.
   useEffect(() => {
     if (phase !== 'train-arriving') return;
     const targetX = -77;
     let currentX = -TRAIN_WIDTH_VW;
-
     const animate = () => {
       const diff = targetX - currentX;
       if (Math.abs(diff) < 0.3) {
         currentX = targetX;
         setTrainX(targetX);
         setPhase('train-stopped');
-        // Open doors after stopping
         setTimeout(() => {
           setDoorsOpen(true);
           setPhase('doors-open');
@@ -102,8 +98,7 @@ export default function HomePage() {
         }, 800);
         return;
       }
-      // Ease out
-      currentX += diff * 0.04;
+      currentX += diff * 0.02;
       setTrainX(currentX);
       trainAnimRef.current = requestAnimationFrame(animate);
     };
@@ -208,7 +203,9 @@ export default function HomePage() {
     return () => cancelAnimationFrame(frameLoopRef.current);
   }, [phase]);
 
-  // Boarding: auto-walk robot to door center, then play board animation
+  // Boarding: auto-walk robot to door center at a constant speed, then play
+  // the board animation. Constant speed (not lerp) so large distances look
+  // like walking instead of teleporting.
   useEffect(() => {
     if (phase !== 'boarding') return;
     const targetX = getDoorCenterPercent();
@@ -220,17 +217,24 @@ export default function HomePage() {
       return;
     }
 
-    setRobotAnim(currentX < targetX ? 'runRight' : 'runLeft');
+    const direction = currentX < targetX ? 1 : -1;
+    setRobotAnim(direction > 0 ? 'runRight' : 'runLeft');
+    const SPEED = 18; // % of viewport per second — matches a natural walk pace
+    let lastT = 0;
     let raf = 0;
-    const step = () => {
-      const diff = targetX - currentX;
-      if (Math.abs(diff) < 0.3) {
+    const step = (t: number) => {
+      if (lastT === 0) lastT = t;
+      const dt = (t - lastT) / 1000;
+      lastT = t;
+      const remaining = targetX - currentX;
+      const stepSize = SPEED * dt * direction;
+      if (Math.abs(stepSize) >= Math.abs(remaining)) {
         currentX = targetX;
         setRobotX(targetX);
         setRobotAnim('boardTrain');
         return;
       }
-      currentX += diff * 0.08;
+      currentX += stepSize;
       setRobotX(currentX);
       raf = requestAnimationFrame(step);
     };
@@ -248,15 +252,21 @@ export default function HomePage() {
     });
   }, []);
 
-  // Board complete -> close door, then show destination
+  // Board complete -> close door, then either show destination modal or,
+  // if the user already chose a destination via the nav dropdown, skip the
+  // modal and trigger departure directly.
   const onBoardComplete = useCallback(() => {
     setDoorsOpen(false); // door slides right (back to closed)
     setTimeout(() => {
-      setDestMenu('main');
-      setShowDestination(true);
-      setPhase('destination');
+      if (pendingRoute) {
+        setPhase('departing');
+      } else {
+        setDestMenu('main');
+        setShowDestination(true);
+        setPhase('destination');
+      }
     }, 800); // wait for door close animation (0.7s) + small buffer
-  }, []);
+  }, [pendingRoute]);
 
   // Get door center position as percentage
   const getDoorCenterPercent = () => {
@@ -287,19 +297,21 @@ export default function HomePage() {
   return (
     <div className="homepage" style={{ ['--ui-scale' as string]: uiScale } as CSSProperties}>
       {/* Header — logo + nav */}
-      <header className="site-header">
-        <div className="logo">Xp</div>
-        <nav className="site-nav">
-          <a href="#about">About</a>
-          <a href="#projects">Projects</a>
-          <a href="#blog">Blog</a>
-          <a href="#contact">Contact</a>
-        </nav>
-      </header>
+      <SiteHeader
+        onDestinationSelect={(path) => {
+          // Only intercept if the train is docked with doors open — otherwise
+          // there's no sensible boarding animation to run, let Link navigate.
+          if (phase !== 'doors-open') return false;
+          setPendingRoute(path);
+          setShowHint(false);
+          setPhase('boarding');
+          return true;
+        }}
+      />
 
       {/* Welcome text */}
       <section className="welcome">
-        <h1>Hi! I'm Xiangpeng,</h1>
+        <h1><span className="welcome-hi">Hi!</span> I'm Xiangpeng,</h1>
         <h1>An interdisciplinary designer and engineer.</h1>
         <p>Industrial Design, Game Design, IoT, Robotics</p>
       </section>

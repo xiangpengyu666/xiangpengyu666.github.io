@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
+import SiteHeader from '../components/SiteHeader';
 import useUiScale from '../hooks/useUiScale';
 import './ProjectsPage.css';
 import './WorkProjectsPage.css';
@@ -313,15 +314,7 @@ export default function WorkProjectsPage() {
   return (
     <div className="projects-page work-projects-page" style={{ ['--ui-scale' as string]: uiScale } as CSSProperties}>
       {/* Header — same as home */}
-      <header className="site-header">
-        <div className="logo">Xp</div>
-        <nav className="site-nav">
-          <a href="#about">About</a>
-          <a href="#projects">Projects</a>
-          <a href="#blog">Blog</a>
-          <a href="#contact">Contact</a>
-        </nav>
-      </header>
+      <SiteHeader />
 
       {/* Welcome title — fades in/out during train departure */}
       <div
