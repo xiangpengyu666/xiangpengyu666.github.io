@@ -30,7 +30,9 @@ idle-start → greeting → free-roam → train-arriving → train-stopped → d
 - Keyboard input (`←/→` or `a/d`) is captured via a ref-based `Set<string>` to avoid re-render lag; movement runs in a `requestAnimationFrame` loop.
 - The train slides in via its own rAF loop (ease-out lerp, `diff * 0.02` — halved from the original 0.04 for a more leisurely pull-in ~4s); `trainX` starts at `-TRAIN_WIDTH_VW` (fully off-screen left) and stops at `-77%`, which puts the door center at ~17% of the viewport. Train width = `calc(95vw * var(--train-scale))` — `TRAIN_SCALE = 1.25` in both TS and CSS (keep in sync). The train is also nudged down by `5px * uiScale` (inline style) to sit a touch below the platform line.
 - Train arrival happens **after** greeting completes (serial flow): `greeting → free-roam (500ms) → train-arriving → train-stopped (800ms) → doors-open`. A past revision tried running them in parallel — reverted so the user actually watches the greeting before the train shows up.
-- Auto-walk to door (during `boarding` phase, both from Space key and nav-dropdown intercept) uses **constant speed 18%/sec**, not ease-out lerp — large distances look like walking, not teleporting.
+- Auto-walk to door (during `boarding` phase, both from Space key and side-nav/dropdown intercept) uses **constant speed 24%/sec** (was 18, sped up), not ease-out lerp — large distances look like walking, not teleporting. The `boardTrain` sprite also runs at **fps 30** (doubled from the original 15) so the boarding animation feels snappy.
+- The `departing` phase slides the train off-screen right at **70 %/s** (up from 45) — applies on HomePage and mirrored on the two project pages' `train-leaving` phase.
+- Keyboard horizontal walk speed: HomePage uses `MOVE_SPEED * 0.30` (doubled from 0.15); the project pages use `0.36` (doubled from 0.18). Update all three together when retuning.
 - The door overlay (`.train-doors`) aligns to the rightmost (door-less) entrance in `Final_train.png`. **Double sliding doors**: two `door_panel_v3.png` panels (right one mirrored via `scaleX(-1)`) sit closed during arrival to match the closed doors painted at the train's other entrances; on `.open` they slide outward (left panel left, right panel right). After the boarding animation completes, `setDoorsOpen(false)` closes them before the destination modal appears.
 - **Door positioning is pixel-tuned to `Final_train.png` (4096×808, aspect 5.07:1) — do not "clean up" without re-aligning visually**. All offsets are `vw * var(--train-scale)` so they scale *with the train* (not with `--ui-scale`, which is dampened on large screens):
   - `.train-doors { left: 80%; top: calc(24% + 1.471vw * var(--train-scale)); width: 6.3%; height: calc(49.5% + 2.153vw * var(--train-scale)); }` (overlay box on the train)
@@ -47,6 +49,19 @@ idle-start → greeting → free-roam → train-arriving → train-stopped → d
   - In the same condition, `.train-doors` inline `zIndex: 30` lifts the door panels above robot/hint-bubble so the closing animation reads as "doors covering the robot".
   - This works because `.train-container` intentionally has NO z-index → no stacking context → its child `.train-doors`'s z-index escapes to compete with the robot's z at the page root.
   - **Don't try to "fix" this with opacity transitions or DOM removal** — earlier attempts hit a CSS rabbit hole (door PNG has transparent edges, `transform` on `.scene`/robot creates stacking contexts that trap z-index, etc.). The z=1 trick works.
+
+### HomePage side-nav (right-edge red→black list with bullets)
+
+When `phase === 'train-arriving'` flips on, a vertical nav slides in on the right side of HomePage and **persists until the user clicks an item** (or the page navigates away). Renders About / Projects / Blog / Contact, with Projects expanding into a Personal/Work submenu on hover/focus/click. Implemented inline in `HomePage.tsx` (it's homepage-specific, not shared).
+
+- **Bullets**: filled circles, color `#F2D18B` (warm yellow), with a subtle two-stop glow. The whole nav has a thin vertical line on the left at `opacity 0.4` (`width: 1.5px`); the submenu has its own shorter sub-line indented further right.
+- **Position is vw-based** (`top: calc(50% - 5.5vw + 65px)`, `right: calc(5rem * var(--ui-scale) + 17vw - 60px)`) so the buttons track the viewport linearly — `--ui-scale` is dampened on big screens, vw is not, and we want the side-nav to follow the layout 1:1.
+- **Click flow** (top-level + submenu items both):
+  1. `setPendingRoute(path)` + `setSideNavExiting(true)`.
+  2. CSS `.exiting` class swaps the entrance `animation: sideNavFadeIn` for `animation: sideNavFadeOut 2s forwards` — explicitly *replacing* the entrance animation, because a plain class change can't override the entrance keyframes' pinned opacity (this bit me the first time). The exit animation also `translateX(60px)` so the nav slides right while fading.
+  3. A new `useEffect` watches for `phase === 'doors-open' && pendingRoute` and auto-triggers `setPhase('boarding')` — so the full robot walk → board → doors-close → train depart → navigate sequence runs even though the user clicked before the train finished arriving.
+- **Projects dropdown**: `<div className="side-nav-dropdown">` wrapping a `<button>` trigger and a `<div className="side-nav-sub">` panel. Expansion via `:hover`, `:focus-within`, OR a manual `.open` class toggled in the trigger's onClick (touch/keyboard). Sub-items use smaller bullets (0.5rem vs 0.7rem) and smaller font (1.9rem vs 3.1rem) at `opacity 0.85` to read as nested. When expanded, the sub-list adds `margin-top` equal to the parent `gap` so it sits visually centered between Projects and Blog.
+- HomePage passes `hideNav` to `<SiteHeader />` (see below) — only the Xp logo is rendered up top; this side-nav is the user's nav surface on the homepage.
 
 ### Destination modal (HomePage)
 
@@ -69,6 +84,7 @@ Used by HomePage / ProjectsPage / WorkProjectsPage — replaces the inline `<hea
   - Inner `.nav-dropdown-panel` is the actual white rounded card.
   - The mouse never leaves `.nav-dropdown` while crossing from trigger down into the menu, so `:hover` stays sticky. **Don't add a `margin-top` gap, it re-introduces the bug.**
 - `:focus-within` support for keyboard accessibility.
+- `hideNav?: boolean` prop hides the entire `<nav>` (only the Xp logo renders). HomePage uses this — its side-nav serves as the nav surface there.
 - `onDestinationSelect?: (path) => boolean` prop: when a caller supplies this and it returns `true`, the Link's click is `preventDefault()`d so the caller can run its own animation. HomePage uses this to trigger the full boarding sequence when `phase === 'doors-open'`:
   ```ts
   onDestinationSelect={(path) => {
@@ -131,12 +147,17 @@ Flow:
 1. **Train entry** — train slides in from left (`trainX: -TRAIN_WIDTH_VW → -77`, same easing as HomePage arrival), carrying the robot (robot hidden during entry — it's "inside" the train).
 2. **Doors open + idle robot** — `setDoorsOpen(true)` triggers the 0.7s panel slide. Robot is placed at door center in `idle` pose, raised `31px * uiScale` (so it appears to stand on the train floor), with `.train-container` inline `zIndex: 20` lifting it above `.scene` (z 6) so closed doors hide the robot during the slide.
 3. **Pause + transition** — after doors finish (700ms), train z drops back to 5 (so robot is now visibly in front), then 500ms idle pause for the standing animation.
-4. **Disembark walk** — `runRight` animation, robot's px offsets lerp from `(0, -31 * uiScale)` to `(40 * uiScale, 0)` over 1.5s (steps right ~40px and down ~31px to land on the platform). On free-roam entry, `robotDxPx` is converted to vw and baked into `robotX` to avoid a visual snap.
-5. **Doors close → train departs** — doors close (`.open` class removed, 0.7s transition), then train slides off-screen right at constant 45%/s.
-6. **Title fade** — in parallel with the train leaving, `"Welcome to Xiangpeng's personal projects"` fades in (PuHuiTi 80px / `clamp(2.5rem, 4.2vw, 5rem)`, 0.9s transition), holds ~1.8s, fades out.
-7. **Project cards appear** — 5 cards (01–05) positioned along a scene wider than viewport (`SCENE_WIDTH_VW = 300`) fade in together via `.projects-row.visible`. Plus a `.to-be-continued` overlay (robot+sign+cone composite at `xVw=265`) at scene end.
-8. **Free-roam + camera follow** — robot moves with ←/→ or a/d across the scene; `cameraX` keeps the robot near viewport center by translating `.scene` (`transform: translateX(-cameraX vw)`), clamped to scene edges. The train is rendered OUTSIDE `.scene` so it stays in viewport coordinates during entry/exit. **Camera-follow useEffect is gated to non-train phases** — during the train sequence, `cameraX` is forced to 0 so the robot appears at the door (its real scene-vw position), not re-centered to mid-viewport.
-9. **Jump → modal** — when robot is within 6vw of a project's `xVw` and user presses Space, play jump animation; on completion, open the project detail modal. Esc or click-outside closes it.
+4. **Disembark walk** — `runRight` animation, robot's px offsets lerp from `(0, -31 * uiScale)` to `(40 * uiScale, 0)` over **750ms** (was 1500, sped up 2×). On completion, `robotDxPx` is converted to vw and baked into `robotX` so the position is in scene-vw without a visual snap, then `autoWalkRef.current` is **immediately set to walk to project 01** (see #8).
+5. **Doors close → train departs** — doors close (`.open` class removed, 0.7s transition), then train slides off-screen right at constant **70 %/s** (was 45). Title fade and the auto-walk to project 01 run **in parallel** with this — the user sees the robot pacing across the scene as the train departs and the title fades in.
+6. **Title fade** — `"Welcome to Xiangpeng's personal projects"` fades in (PuHuiTi 80px / `clamp(2.5rem, 4.2vw, 5rem)`, **0.45s** transition, was 0.9s), holds **900ms** (was 1800), fades out **450ms** (was 900). All halved together; CSS lives in `ProjectsPage.css` shared with WorkProjectsPage.
+7. **Project cards appear** — 5 cards (01–05) positioned along a scene wider than viewport (`SCENE_WIDTH_VW = 300`) fade in together via `.projects-row.visible`. Plus a `.to-be-continued` overlay at scene end.
+8. **Auto-walk to project 01 + camera follow** — kicked off the moment the disembark walk ends (step 4). The shared movement loop now runs from `doors-closing` onwards (not just `free-roam`) so the auto-walk drives the robot across the scene during steps 5–7. Camera-follow gate matches: only `train-entering / train-stopped / doors-opening / robot-exiting` lock cameraX = 0 — once disembark finishes, the camera follows the robot toward project 01 in parallel with the train leaving. The auto-walk uses `speedMul: 0.5` (half the default) so the cross-scene saunter visually matches the unhurried title fade.
+9. **Free-roam** — once auto-walk completes, robot stands at project 01 ready for input. Keyboard ←/→ or a/d moves at `MOVE_SPEED * 0.36`; the loop also gates keyboard input to `phase === 'free-roam'` so accidental keypresses during the auto-walk don't interfere.
+10. **Project entry — three ways**:
+    - **Space**: when robot is within 6vw of any project's `xVw`, plays jump animation → opens project detail modal.
+    - **Click card**: walks the robot to that project's `xVw` (or jumps immediately if already near), then jumps and opens detail. Cards have `role="button"`, `tabIndex` (when in free-roam), and `Enter` keyboard support.
+    - **Side-arrow buttons** (`.nav-arrow-left/right`, viewport-fixed): step to the prior/next nearest project at `speedMul: 1.5` (faster than auto/manual walk). Buttons disable at scene edges.
+    Esc or click-outside the modal closes it.
 
 Key coordinates:
 - Robot position (`robotX`) is in **scene vw** (0 to `SCENE_WIDTH_VW`), NOT viewport %. Same for each `PROJECTS[i].xVw`.
@@ -164,6 +185,8 @@ Differences from Personal Projects:
 - Same shared to-be-continued sign/asset as personal page — but the sign was bumped up 32% relative to the original 60vh (`height: 79.35vh`) and its translate nudge is `+90px / +65px * ui-scale`.
 
 Routing: user on HomePage → destination modal → Projects → Work Projects → `/work`. Click flow also available via the Projects nav-dropdown (`Work` item).
+
+**Same auto-walk + click-to-jump + arrow nav as Personal Projects** — the post-disembark autoWalkRef-to-project-01, the card onClick, and the side `nav-arrow` buttons are mirrored. One Work-only twist: because the thumb is left-aligned within the card, the **visible image center is offset ~3.88vw to the LEFT of the card's `xVw` anchor**. `WORK_IMG_OFFSET_VW = -3.88` is applied wherever a project's target position is computed (`projectTargetVw(p)`, the Space-key proximity check, the disembark auto-walk target, and the arrow-nav `canLeft/canRight` math) so the robot lands directly under the visible image, not under the card's geometric center.
 
 ### Figma integration
 

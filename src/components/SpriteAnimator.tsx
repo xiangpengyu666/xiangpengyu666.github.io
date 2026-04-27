@@ -33,7 +33,7 @@ export const SPRITES: Record<string, SpriteConfig> = {
   greeting: {
     src: greetingSrc,
     frameWidth: 315, frameHeight: 177,
-    columns: 13, totalFrames: 151, fps: 24, loop: false,
+    columns: 13, totalFrames: 151, fps: 40, loop: false,
     yOffset: 10,
   },
   jump: {
@@ -45,7 +45,7 @@ export const SPRITES: Record<string, SpriteConfig> = {
   boardTrain: {
     src: boardSrc,
     frameWidth: 144, frameHeight: 190,
-    columns: 10, totalFrames: 48, fps: 15, loop: false,
+    columns: 10, totalFrames: 48, fps: 30, loop: false,
     scale: 0.9,
     xOffset: 6,
     yOffset: 0,

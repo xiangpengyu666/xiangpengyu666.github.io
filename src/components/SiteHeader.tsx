@@ -8,6 +8,8 @@ interface Props {
    * and navigate when ready). Return false to let the Link navigate normally.
    */
   onDestinationSelect?: (path: string) => boolean;
+  /** Hide the nav links entirely — only the Xp logo is rendered. */
+  hideNav?: boolean;
 }
 
 /**
@@ -17,7 +19,7 @@ interface Props {
  * The Projects entry is a hover/focus dropdown split into Personal + Work.
  * Uses CSS :hover / :focus-within — no JS state needed for the dropdown.
  */
-export default function SiteHeader({ onDestinationSelect }: Props = {}) {
+export default function SiteHeader({ onDestinationSelect, hideNav }: Props = {}) {
   const intercept = (path: string) => (e: MouseEvent) => {
     if (onDestinationSelect?.(path)) e.preventDefault();
   };
@@ -25,6 +27,7 @@ export default function SiteHeader({ onDestinationSelect }: Props = {}) {
   return (
     <header className="site-header">
       <Link to="/" className="logo" aria-label="Home">Xp</Link>
+      {!hideNav && (
       <nav className="site-nav">
         <Link to="/about" onClick={intercept('/about')}>About</Link>
         <div className="nav-dropdown">
@@ -39,6 +42,7 @@ export default function SiteHeader({ onDestinationSelect }: Props = {}) {
         <Link to="/blog" onClick={intercept('/blog')}>Blog</Link>
         <Link to="/contact" onClick={intercept('/contact')}>Contact</Link>
       </nav>
+      )}
     </header>
   );
 }

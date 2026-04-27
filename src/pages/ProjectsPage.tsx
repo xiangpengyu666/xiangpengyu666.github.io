@@ -74,6 +74,14 @@ export default function ProjectsPage() {
   const keysRef = useRef<Set<string>>(new Set());
   const frameLoopRef = useRef<number>(0);
   const trainAnimRef = useRef<number>(0);
+  // Auto-walk: when set, the free-roam loop drives the robot toward target
+  // (in scene-vw) at constant speed, optionally triggering a jump on arrival.
+  const autoWalkRef = useRef<{ target: number; jumpProject: typeof PROJECTS[number] | null; speedMul?: number } | null>(null);
+  // Mirrors phase for use inside event handlers / button onClick without re-binding.
+  const phaseRef = useRef(phase);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+  const robotXRef = useRef(robotX);
+  useEffect(() => { robotXRef.current = robotX; }, [robotX]);
 
   // Helper: door center in viewport percent
   const getDoorCenterPercent = useCallback(() => trainX + 0.835 * TRAIN_WIDTH_VW, [trainX]);
@@ -115,11 +123,11 @@ export default function ProjectsPage() {
     return () => clearTimeout(t);
   }, [phase, getDoorCenterPercent]);
 
-  // ═══ Phase 3: Robot walks right 40px and steps down 20px over ~1.5s ═══
+  // ═══ Phase 3: Robot walks right 40px and steps down 20px over ~0.75s (sped up 2×) ═══
   useEffect(() => {
     if (phase !== 'robot-exiting') return;
     setRobotAnim('runRight');
-    const duration = 1500;
+    const duration = 750;
     const t0 = performance.now();
     const startDx = 0;
     const startDy = -31 * uiScale;
@@ -135,7 +143,19 @@ export default function ProjectsPage() {
       if (p < 1) {
         raf = requestAnimationFrame(step);
       } else {
-        setRobotAnim('idle');
+        // Robot has finished the disembark mini-walk. Bake the px offset
+        // into scene-vw so robotX accurately reflects the visible position,
+        // then immediately kick off the auto-walk to project 01 — runs in
+        // parallel with door close + train departure + title fade.
+        const dxVw = (targetDx / window.innerWidth) * 100;
+        setRobotX(prev => {
+          const startX = prev + dxVw;
+          robotXRef.current = startX;
+          return startX;
+        });
+        setRobotDxPx(0);
+        setRobotDyPx(0);
+        autoWalkRef.current = { target: PROJECTS[0].xVw, jumpProject: null, speedMul: 0.5 };
         setPhase('doors-closing');
       }
     };
@@ -158,7 +178,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     if (phase !== 'train-leaving') return;
     const targetX = 100;
-    const SPEED = 45; // %/s
+    const SPEED = 70; // %/s
     let currentX = trainX;
     let lastT = 0;
     let raf = 0;
@@ -200,8 +220,8 @@ export default function ProjectsPage() {
         setPhase('projects-appearing');
         setCardsVisible(true);
         setTimeout(() => setPhase('free-roam'), 900);
-      }, 900); // wait for fade-out transition
-    }, 1800); // hold duration
+      }, 450); // wait for fade-out transition (sped up 2×)
+    }, 900); // hold duration (sped up 2×)
     return () => clearTimeout(hold);
   }, [phase]);
 
@@ -209,6 +229,10 @@ export default function ProjectsPage() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       keysRef.current.add(e.key);
+      // Manual movement cancels any in-progress auto-walk.
+      if (['ArrowLeft', 'ArrowRight', 'a', 'd'].includes(e.key)) {
+        autoWalkRef.current = null;
+      }
       if (e.key === ' ' && phase === 'free-roam') {
         e.preventDefault();
         // Check if robot is near any project (within 6vw of card center)
@@ -234,17 +258,52 @@ export default function ProjectsPage() {
   }, [phase, robotX]);
 
   // ═══ Movement loop + camera follow ═══
+  // Runs from `doors-closing` onward so the auto-walk (kicked off the moment
+  // the disembark mini-walk completes) can drive the robot toward project 01
+  // in parallel with door-close / train-leave / title fade.
   useEffect(() => {
-    if (phase !== 'free-roam') return;
-    // Convert any leftover px offset from the disembark into scene-vw before
-    // resetting, so the robot's visible position doesn't snap.
-    if (robotDxPx !== 0 || robotDyPx !== 0) {
-      const dxVw = (robotDxPx / window.innerWidth) * 100;
-      setRobotX(prev => prev + dxVw);
-      setRobotDxPx(0);
-      setRobotDyPx(0);
-    }
+    const runPhases: Phase[] = ['doors-closing', 'train-leaving', 'title-showing', 'projects-appearing', 'free-roam'];
+    if (!runPhases.includes(phase)) return;
+    const AUTO_SPEED_BASE = MOVE_SPEED * 0.27; // a touch faster than manual walk
     const loop = () => {
+      const aw = autoWalkRef.current;
+      if (aw) {
+        const AUTO_SPEED = AUTO_SPEED_BASE * (aw.speedMul ?? 1);
+        const cur = robotXRef.current;
+        const dist = aw.target - cur;
+        const absDist = Math.abs(dist);
+        if (absDist < AUTO_SPEED) {
+          setRobotX(aw.target);
+          robotXRef.current = aw.target;
+          autoWalkRef.current = null;
+          if (aw.jumpProject) {
+            setActiveProject(aw.jumpProject);
+            setRobotAnim('jump');
+            setPhase('jumping');
+            return; // stop the loop; phase is no longer free-roam
+          }
+          setRobotAnim('idle');
+        } else {
+          const dir: 'left' | 'right' = dist > 0 ? 'right' : 'left';
+          const next = cur + (dir === 'right' ? AUTO_SPEED : -AUTO_SPEED);
+          const clamped = Math.max(2, Math.min(SCENE_WIDTH_VW - 2, next));
+          setRobotX(clamped);
+          robotXRef.current = clamped;
+          if (dir === 'left') {
+            setRobotAnim(prev => (prev !== 'runLeft' && prev !== 'turnLeft') ? 'turnLeft' : prev);
+          } else {
+            setRobotAnim(prev => (prev !== 'runRight' && prev !== 'turnRight') ? 'turnRight' : prev);
+          }
+        }
+        frameLoopRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
+      // Keyboard input only acts in free-roam.
+      if (phase !== 'free-roam') {
+        frameLoopRef.current = requestAnimationFrame(loop);
+        return;
+      }
       const keys = keysRef.current;
       let direction: 'left' | 'right' | null = null;
       if (keys.has('ArrowLeft') || keys.has('a')) direction = 'left';
@@ -252,7 +311,7 @@ export default function ProjectsPage() {
 
       if (direction) {
         setRobotX(prev => {
-          const next = direction === 'left' ? prev - MOVE_SPEED * 0.18 : prev + MOVE_SPEED * 0.18;
+          const next = direction === 'left' ? prev - MOVE_SPEED * 0.36 : prev + MOVE_SPEED * 0.36;
           return Math.max(2, Math.min(SCENE_WIDTH_VW - 2, next));
         });
         if (direction === 'left') {
@@ -279,11 +338,13 @@ export default function ProjectsPage() {
   // so robot appears at the door (its true scene-vw position) instead of being
   // re-centered to mid-viewport the moment it becomes visible.
   useEffect(() => {
-    const trainPhases: Phase[] = [
-      'train-entering', 'train-stopped', 'doors-opening',
-      'robot-exiting', 'doors-closing', 'train-leaving',
+    // Pin camera while train is arriving / robot is still by the door.
+    // Once disembark mini-walk completes (phase ≥ doors-closing), let the
+    // camera follow the robot as it walks toward project 01.
+    const lockedPhases: Phase[] = [
+      'train-entering', 'train-stopped', 'doors-opening', 'robot-exiting',
     ];
-    if (trainPhases.includes(phase)) {
+    if (lockedPhases.includes(phase)) {
       setCameraX(0);
       return;
     }
@@ -304,6 +365,56 @@ export default function ProjectsPage() {
     setRobotAnim('idle');
     setPhase('project-detail');
   }, []);
+
+  // Find nearest project index relative to current robotX (used by arrow nav).
+  const getNearestProjectIndex = useCallback(() => {
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    PROJECTS.forEach((p, i) => {
+      const d = Math.abs(p.xVw - robotXRef.current);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    });
+    return bestIdx;
+  }, []);
+
+  // Walk to a project's xVw; if jumpAfter, trigger jump + open modal on arrival.
+  const walkToProject = useCallback((proj: typeof PROJECTS[number], jumpAfter: boolean, speedMul?: number) => {
+    if (phaseRef.current !== 'free-roam') return;
+    const NEAR = 1.5; // vw — already "there"
+    if (Math.abs(proj.xVw - robotXRef.current) < NEAR) {
+      if (jumpAfter) {
+        autoWalkRef.current = null;
+        setActiveProject(proj);
+        setRobotAnim('jump');
+        setPhase('jumping');
+      }
+      return;
+    }
+    autoWalkRef.current = { target: proj.xVw, jumpProject: jumpAfter ? proj : null, speedMul };
+  }, []);
+
+  // Arrow nav handlers — jump to neighbor of current nearest project.
+  const onArrowClick = useCallback((dir: 'left' | 'right') => {
+    if (phaseRef.current !== 'free-roam') return;
+    const idx = getNearestProjectIndex();
+    // If robot isn't actually centered on the nearest, treat current project as target;
+    // otherwise step to the neighbor.
+    const onTarget = Math.abs(PROJECTS[idx].xVw - robotXRef.current) < 1.5;
+    let nextIdx = idx;
+    if (onTarget) {
+      nextIdx = dir === 'left' ? idx - 1 : idx + 1;
+    } else {
+      // Snap to current nearest in the chosen direction (or just nearest).
+      if (dir === 'left' && PROJECTS[idx].xVw > robotXRef.current && idx > 0) nextIdx = idx - 1;
+      if (dir === 'right' && PROJECTS[idx].xVw < robotXRef.current && idx < PROJECTS.length - 1) nextIdx = idx + 1;
+    }
+    if (nextIdx < 0 || nextIdx >= PROJECTS.length) return;
+    walkToProject(PROJECTS[nextIdx], false, 1.5);
+  }, [getNearestProjectIndex, walkToProject]);
+
+  const onCardClick = useCallback((proj: typeof PROJECTS[number]) => {
+    walkToProject(proj, true);
+  }, [walkToProject]);
 
   const getCurrentSprite = () => {
     switch (robotAnim) {
@@ -359,7 +470,11 @@ export default function ProjectsPage() {
             <div
               key={p.id}
               className="project-card"
-              style={{ left: `${p.xVw}vw` }}
+              style={{ left: `${p.xVw}vw`, cursor: phase === 'free-roam' ? 'pointer' : 'default' }}
+              onClick={() => onCardClick(p)}
+              role="button"
+              tabIndex={phase === 'free-roam' ? 0 : -1}
+              onKeyDown={(e) => { if (e.key === 'Enter') onCardClick(p); }}
             >
               <div className="project-number">{p.id}</div>
               <div className="project-thumb">
@@ -443,10 +558,40 @@ export default function ProjectsPage() {
         </div>
       )}
 
+      {/* Arrow nav — viewport-fixed, click to walk to neighbor project */}
+      {phase === 'free-roam' && (() => {
+        const idx = getNearestProjectIndex();
+        const onTarget = Math.abs(PROJECTS[idx].xVw - robotX) < 1.5;
+        const canLeft = onTarget ? idx > 0 : (PROJECTS[idx].xVw > robotX || idx > 0);
+        const canRight = onTarget ? idx < PROJECTS.length - 1 : (PROJECTS[idx].xVw < robotX || idx < PROJECTS.length - 1);
+        return (
+          <>
+            <button
+              type="button"
+              className="nav-arrow nav-arrow-left"
+              onClick={() => onArrowClick('left')}
+              disabled={!canLeft}
+              aria-label="Previous project"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="nav-arrow nav-arrow-right"
+              onClick={() => onArrowClick('right')}
+              disabled={!canRight}
+              aria-label="Next project"
+            >
+              ›
+            </button>
+          </>
+        );
+      })()}
+
       {/* Controls hint */}
       {phase === 'free-roam' && (
         <div className="controls-hint">
-          <kbd>←</kbd> <kbd>→</kbd> move · <kbd>Space</kbd> open project
+          <kbd>←</kbd> <kbd>→</kbd> move · <kbd>Space</kbd> or click card to open
         </div>
       )}
 

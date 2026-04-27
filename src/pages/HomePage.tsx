@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
 import SiteHeader from '../components/SiteHeader';
 import useUiScale from '../hooks/useUiScale';
@@ -59,6 +59,8 @@ export default function HomePage() {
   const [showDestination, setShowDestination] = useState(false);
   const [destMenu, setDestMenu] = useState<'main' | 'projects'>('main');
   const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+  const [sideNavShown, setSideNavShown] = useState(false);
+  const [sideNavExiting, setSideNavExiting] = useState(false);
   const navigate = useNavigate();
   const keysRef = useRef<Set<string>>(new Set());
   const frameLoopRef = useRef<number>(0);
@@ -68,7 +70,7 @@ export default function HomePage() {
     const timer = setTimeout(() => {
       setPhase('greeting');
       setRobotAnim('greeting');
-    }, 1000);
+    }, 300);
     return () => clearTimeout(timer);
   }, []);
 
@@ -76,13 +78,14 @@ export default function HomePage() {
   const onGreetingComplete = useCallback(() => {
     setRobotAnim('idle');
     setPhase('free-roam');
-    setTimeout(() => setPhase('train-arriving'), 500);
+    setTimeout(() => setPhase('train-arriving'), 200);
   }, []);
 
   // Train arrival — only after greeting finishes. Speed factor 0.02 (half of
   // the original 0.04) for a more leisurely pull-in.
   useEffect(() => {
     if (phase !== 'train-arriving') return;
+    setSideNavShown(true);
     const targetX = -77;
     let currentX = -TRAIN_WIDTH_VW;
     const animate = () => {
@@ -106,11 +109,20 @@ export default function HomePage() {
     return () => cancelAnimationFrame(trainAnimRef.current);
   }, [phase]);
 
+  // If the user picked a side-nav destination before doors finished opening,
+  // wait for `doors-open` then auto-trigger the boarding sequence.
+  useEffect(() => {
+    if (phase === 'doors-open' && pendingRoute) {
+      setShowHint(false);
+      setPhase('boarding');
+    }
+  }, [phase, pendingRoute]);
+
   // Departing: train slides off-screen right at constant speed, then navigates
   useEffect(() => {
     if (phase !== 'departing') return;
     const targetX = 100; // off-screen right
-    const SPEED = 45;    // % of viewport per second — constant velocity
+    const SPEED = 70;    // % of viewport per second
     let currentX = trainX;
     let lastT = 0;
     let raf = 0;
@@ -177,7 +189,7 @@ export default function HomePage() {
 
       if (moving && direction) {
         setRobotX(prev => {
-          const next = direction === 'left' ? prev - MOVE_SPEED * 0.15 : prev + MOVE_SPEED * 0.15;
+          const next = direction === 'left' ? prev - MOVE_SPEED * 0.30 : prev + MOVE_SPEED * 0.30;
           return Math.max(5, Math.min(95, next));
         });
 
@@ -219,7 +231,7 @@ export default function HomePage() {
 
     const direction = currentX < targetX ? 1 : -1;
     setRobotAnim(direction > 0 ? 'runRight' : 'runLeft');
-    const SPEED = 18; // % of viewport per second — matches a natural walk pace
+    const SPEED = 24; // % of viewport per second — between natural (18) and 2× (36)
     let lastT = 0;
     let raf = 0;
     const step = (t: number) => {
@@ -298,6 +310,7 @@ export default function HomePage() {
     <div className="homepage" style={{ ['--ui-scale' as string]: uiScale } as CSSProperties}>
       {/* Header — logo + nav */}
       <SiteHeader
+        hideNav
         onDestinationSelect={(path) => {
           // Only intercept if the train is docked with doors open — otherwise
           // there's no sensible boarding animation to run, let Link navigate.
@@ -362,7 +375,7 @@ export default function HomePage() {
             className="robot-container"
             style={{
               left: `${robotX}%`,
-              bottom: `${100 - PLATFORM_Y}%`,
+              bottom: `calc(${100 - PLATFORM_Y}% - 2px)`,
               transform: `translateX(calc(-50% + ${xOffset * uiScale}px)) translateY(${yOffset * uiScale}px)`,
               // Drop robot below doors (z 30) during the closing animation so the
               // panels visually cover it as they slide back into place.
@@ -393,7 +406,42 @@ export default function HomePage() {
 
       </div>
 
-      {/* Welcome text */}
+      {/* Side nav — appears as the train pulls in, persists until the user
+          clicks one. Click triggers a 400ms fade-out, then navigates. */}
+      {sideNavShown && (() => {
+        const queueRoute = (path: string) => {
+          if (sideNavExiting) return;
+          // Queue the destination — once doors open, the boarding effect
+          // below kicks in automatically and runs the full walk → board →
+          // doors-close → depart → navigate sequence.
+          setPendingRoute(path);
+          setSideNavExiting(true);
+        };
+        return (
+          <nav className={`side-nav ${sideNavExiting ? 'exiting' : ''}`}>
+            <Link to="/about" onClick={(e) => { e.preventDefault(); queueRoute('/about'); }}>About</Link>
+            <div className="side-nav-dropdown">
+              <button
+                type="button"
+                className="side-nav-trigger"
+                onClick={(e) => {
+                  // Tap-to-toggle on touch / keyboard. CSS handles hover.
+                  e.currentTarget.parentElement?.classList.toggle('open');
+                }}
+              >
+                Projects
+              </button>
+              <div className="side-nav-sub">
+                <Link to="/projects" onClick={(e) => { e.preventDefault(); queueRoute('/projects'); }}>Personal</Link>
+                <Link to="/work" onClick={(e) => { e.preventDefault(); queueRoute('/work'); }}>Work</Link>
+              </div>
+            </div>
+            <Link to="/blog" onClick={(e) => { e.preventDefault(); queueRoute('/blog'); }}>Blog</Link>
+            <Link to="/contact" onClick={(e) => { e.preventDefault(); queueRoute('/contact'); }}>Contact</Link>
+          </nav>
+        );
+      })()}
+
       {/* Arrow key hint */}
       {(phase === 'free-roam' || phase === 'train-arriving' || phase === 'train-stopped' || phase === 'doors-open') && (
         <div className="controls-hint">
