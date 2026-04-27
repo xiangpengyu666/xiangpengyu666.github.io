@@ -13,36 +13,16 @@ type Phase =
   | 'train-stopped'  // train stopped, doors opening
   | 'doors-open'     // doors open, waiting for user
   | 'boarding'       // user pressed space at door, boarding animation
-  | 'destination'    // destination selection popup
+  | 'awaiting-dest'  // robot boarded, doors closed, side-nav focused for selection
   | 'departing'      // destination chosen, train slides off-screen right
   ;
-
-const DEST_ROUTES: Record<string, string> = {
-  'Personal Projects': '/projects',
-  'Work Projects': '/work',
-  Gallery: '/gallery',
-  Blog: '/blog',
-  Contact: '/contact',
-};
-
-type MainDest = { label: string; icon: string; desc: string; sub?: boolean };
-const MAIN_DESTS: MainDest[] = [
-  { label: 'Projects', icon: '🔧', desc: 'Personal · Work', sub: true },
-  { label: 'Gallery', icon: '📷', desc: 'Photography' },
-  { label: 'Blog', icon: '✍️', desc: 'Writing & Thoughts' },
-  { label: 'Contact', icon: '✉️', desc: "Let's connect" },
-];
-
-type ProjectsSubDest = { label: string; icon: string; desc: string };
-const PROJECTS_SUB_DESTS: ProjectsSubDest[] = [
-  { label: 'Personal Projects', icon: '🧑‍🎨', desc: 'Industrial · Game · IoT' },
-  { label: 'Work Projects', icon: '💼', desc: 'Ulanzi & beyond' },
-];
 
 type RobotAnim = 'idle' | 'greeting' | 'turnLeft' | 'runLeft' | 'turnRight' | 'runRight' | 'jump' | 'boardTrain';
 
 const ROBOT_SIZE = 130;
-const PLATFORM_Y = 88; // % from top where platform floor is
+const PLATFORM_Y = 95; // % from top where platform floor is — tuned so the
+                       // robot's feet land on the yellow tactile strip in
+                       // platform.webp (yellow line is ~26% from image bottom).
 const MOVE_SPEED = 0.5;
 // Keep in sync with --train-scale in HomePage.css
 const TRAIN_SCALE = 1.25;
@@ -56,8 +36,6 @@ export default function HomePage() {
   const [trainX, setTrainX] = useState(-TRAIN_WIDTH_VW); // % from left (fully off-screen left)
   const [doorsOpen, setDoorsOpen] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [showDestination, setShowDestination] = useState(false);
-  const [destMenu, setDestMenu] = useState<'main' | 'projects'>('main');
   const [pendingRoute, setPendingRoute] = useState<string | null>(null);
   const [sideNavShown, setSideNavShown] = useState(false);
   const [sideNavExiting, setSideNavExiting] = useState(false);
@@ -273,9 +251,8 @@ export default function HomePage() {
       if (pendingRoute) {
         setPhase('departing');
       } else {
-        setDestMenu('main');
-        setShowDestination(true);
-        setPhase('destination');
+        // No preselected route — focus the side-nav so the user picks from there.
+        setPhase('awaiting-dest');
       }
     }, 800); // wait for door close animation (0.7s) + small buffer
   }, [pendingRoute]);
@@ -337,7 +314,7 @@ export default function HomePage() {
           className="train-container"
           style={{
             left: `${trainX}%`,
-            bottom: `calc(${100 - PLATFORM_Y}% - ${5 * uiScale}px)`,
+            bottom: `calc(${100 - PLATFORM_Y}% - ${5 * uiScale}px + ${45 * uiScale}px)`,
           }}
         >
           <img src={`${import.meta.env.BASE_URL}sprites/Final_train.png`} alt="train" className="train-body" />
@@ -363,31 +340,38 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Platform */}
-        <div className="platform" style={{ top: `${PLATFORM_Y}%` }}>
-          <div className="platform-edge" />
-          <div className="platform-floor" />
-        </div>
+        {/* Platform — single illustrated image anchored to viewport bottom. */}
+        <img
+          className="platform-img"
+          src={`${import.meta.env.BASE_URL}sprites/platform.webp`}
+          alt="platform"
+        />
 
         {/* Robot — hidden once user enters destination flow (already on the train) */}
-        {phase !== 'destination' && phase !== 'departing' && (
+        {phase !== 'awaiting-dest' && phase !== 'departing' && (
           <div
-            className="robot-container"
+            className={`robot-container anim-${robotAnim}`}
             style={{
               left: `${robotX}%`,
-              bottom: `calc(${100 - PLATFORM_Y}% - 2px)`,
+              bottom: `calc(${100 - PLATFORM_Y}% - 2px + ${45 * uiScale}px)`,
               transform: `translateX(calc(-50% + ${xOffset * uiScale}px)) translateY(${yOffset * uiScale}px)`,
               // Drop robot below doors (z 30) during the closing animation so the
               // panels visually cover it as they slide back into place.
               zIndex: phase === 'boarding' && !doorsOpen ? 1 : 10,
             }}
           >
-            {/* Hint bubble */}
-            {showHint && (
-              <div className="hint-bubble">
-                <span>Move to the gate & press <kbd>Space</kbd> to board</span>
+            {/* Hint — same form as ProjectsPage: floats above the robot's
+                head, only while idle (no keyboard input), only while the
+                board prompt is active. */}
+            {showHint && robotAnim === 'idle' && (
+              <div className="controls-hint">
+                <kbd>←</kbd> <kbd>→</kbd> to move · <kbd>Space</kbd> to board
               </div>
             )}
+            {/* Ground shadow — anchored to the container's bottom so it
+                stays planted on the platform when the robot's canvas
+                translates up during the jump/board animation. */}
+            <div className="robot-shadow" />
             <SpriteAnimator
               sprite={currentSprite}
               width={ROBOT_SIZE * uiScale * scale * aspectRatio}
@@ -411,14 +395,17 @@ export default function HomePage() {
       {sideNavShown && (() => {
         const queueRoute = (path: string) => {
           if (sideNavExiting) return;
-          // Queue the destination — once doors open, the boarding effect
-          // below kicks in automatically and runs the full walk → board →
-          // doors-close → depart → navigate sequence.
           setPendingRoute(path);
           setSideNavExiting(true);
+          // If the robot has already boarded and we're waiting for a
+          // destination, depart immediately. Otherwise the doors-open effect
+          // above will run the full walk → board → close → depart sequence.
+          if (phase === 'awaiting-dest') {
+            setPhase('departing');
+          }
         };
         return (
-          <nav className={`side-nav ${sideNavExiting ? 'exiting' : ''}`}>
+          <nav className={`side-nav ${sideNavExiting ? 'exiting' : ''} ${phase === 'awaiting-dest' ? 'focused' : ''}`}>
             <Link to="/about" onClick={(e) => { e.preventDefault(); queueRoute('/about'); }}>About</Link>
             <div className="side-nav-dropdown">
               <button
@@ -442,75 +429,10 @@ export default function HomePage() {
         );
       })()}
 
-      {/* Arrow key hint */}
-      {(phase === 'free-roam' || phase === 'train-arriving' || phase === 'train-stopped' || phase === 'doors-open') && (
-        <div className="controls-hint">
-          <kbd>←</kbd> <kbd>→</kbd> to move
-        </div>
-      )}
 
-      {/* Destination selection */}
-      {showDestination && (
-        <div className="destination-overlay">
-          <div className="destination-modal">
-            {destMenu === 'main' ? (
-              <>
-                <h2>Where to?</h2>
-                <p className="destination-sub">Select your destination</p>
-                <div className="destination-options">
-                  {MAIN_DESTS.map(dest => (
-                    <button
-                      key={dest.label}
-                      className="destination-btn"
-                      onClick={() => {
-                        if (dest.sub) {
-                          setDestMenu('projects');
-                          return;
-                        }
-                        setPendingRoute(DEST_ROUTES[dest.label] ?? '/');
-                        setShowDestination(false);
-                        setPhase('departing');
-                      }}
-                    >
-                      <span className="dest-icon">{dest.icon}</span>
-                      <span className="dest-label">{dest.label}</span>
-                      <span className="dest-desc">{dest.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <>
-                <h2>Which projects?</h2>
-                <p className="destination-sub">Personal or work</p>
-                <div className="destination-options">
-                  {PROJECTS_SUB_DESTS.map(dest => (
-                    <button
-                      key={dest.label}
-                      className="destination-btn"
-                      onClick={() => {
-                        setPendingRoute(DEST_ROUTES[dest.label] ?? '/');
-                        setShowDestination(false);
-                        setPhase('departing');
-                      }}
-                    >
-                      <span className="dest-icon">{dest.icon}</span>
-                      <span className="dest-label">{dest.label}</span>
-                      <span className="dest-desc">{dest.desc}</span>
-                    </button>
-                  ))}
-                </div>
-                <button
-                  className="destination-back"
-                  onClick={() => setDestMenu('main')}
-                >
-                  ← Back
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Side-nav focus dim — covers the scene when the robot is awaiting a
+          destination, so attention shifts to the right-side options. */}
+      {phase === 'awaiting-dest' && <div className="side-nav-focus-dim" />}
     </div>
   );
 }

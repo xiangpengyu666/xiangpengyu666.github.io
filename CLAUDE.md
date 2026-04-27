@@ -23,17 +23,18 @@ Single-page portfolio deployed as a GitHub Pages static site. Routing uses `Hash
 `HomePage.tsx` drives a scripted interactive sequence via a `Phase` state machine:
 
 ```
-idle-start → greeting → free-roam → train-arriving → train-stopped → doors-open → boarding → destination
+idle-start → greeting → free-roam → train-arriving → train-stopped → doors-open → boarding → awaiting-dest → departing
 ```
 
-- The robot character is positioned with `robotX` (% from left), sitting on the platform at `PLATFORM_Y = 88%`.
+- The robot character is positioned with `robotX` (% from left), sitting on the platform at `PLATFORM_Y = 95%` (was 88% before the platform image — see *Platform* section).
+- Robot/train baselines apply an extra `+45 * uiScale px` lift on top of `100 - PLATFORM_Y` so they sit on the painted yellow strip in `platform.webp` rather than at the very bottom of the viewport. To-be-continued sign on Project pages uses the same `+45 * uiScale px` offset.
 - Keyboard input (`←/→` or `a/d`) is captured via a ref-based `Set<string>` to avoid re-render lag; movement runs in a `requestAnimationFrame` loop.
 - The train slides in via its own rAF loop (ease-out lerp, `diff * 0.02` — halved from the original 0.04 for a more leisurely pull-in ~4s); `trainX` starts at `-TRAIN_WIDTH_VW` (fully off-screen left) and stops at `-77%`, which puts the door center at ~17% of the viewport. Train width = `calc(95vw * var(--train-scale))` — `TRAIN_SCALE = 1.25` in both TS and CSS (keep in sync). The train is also nudged down by `5px * uiScale` (inline style) to sit a touch below the platform line.
 - Train arrival happens **after** greeting completes (serial flow): `greeting → free-roam (500ms) → train-arriving → train-stopped (800ms) → doors-open`. A past revision tried running them in parallel — reverted so the user actually watches the greeting before the train shows up.
 - Auto-walk to door (during `boarding` phase, both from Space key and side-nav/dropdown intercept) uses **constant speed 24%/sec** (was 18, sped up), not ease-out lerp — large distances look like walking, not teleporting. The `boardTrain` sprite also runs at **fps 30** (doubled from the original 15) so the boarding animation feels snappy.
 - The `departing` phase slides the train off-screen right at **70 %/s** (up from 45) — applies on HomePage and mirrored on the two project pages' `train-leaving` phase.
 - Keyboard horizontal walk speed: HomePage uses `MOVE_SPEED * 0.30` (doubled from 0.15); the project pages use `0.36` (doubled from 0.18). Update all three together when retuning.
-- The door overlay (`.train-doors`) aligns to the rightmost (door-less) entrance in `Final_train.png`. **Double sliding doors**: two `door_panel_v3.png` panels (right one mirrored via `scaleX(-1)`) sit closed during arrival to match the closed doors painted at the train's other entrances; on `.open` they slide outward (left panel left, right panel right). After the boarding animation completes, `setDoorsOpen(false)` closes them before the destination modal appears.
+- The door overlay (`.train-doors`) aligns to the rightmost (door-less) entrance in `Final_train.png`. **Double sliding doors**: two `door_panel_v3.png` panels (right one mirrored via `scaleX(-1)`) sit closed during arrival to match the closed doors painted at the train's other entrances; on `.open` they slide outward (left panel left, right panel right). After the boarding animation completes, `setDoorsOpen(false)` closes them before phase flips to `awaiting-dest` (or directly to `departing` if a route was preselected via side-nav).
 - **Door positioning is pixel-tuned to `Final_train.png` (4096×808, aspect 5.07:1) — do not "clean up" without re-aligning visually**. All offsets are `vw * var(--train-scale)` so they scale *with the train* (not with `--ui-scale`, which is dampened on large screens):
   - `.train-doors { left: 80%; top: calc(24% + 1.471vw * var(--train-scale)); width: 6.3%; height: calc(49.5% + 2.153vw * var(--train-scale)); }` (overlay box on the train)
   - `.door-panel { width: 50%; object-fit: fill; position: relative; }` — `fill` lets panels stretch vertically without distorting horizontal width
@@ -63,16 +64,16 @@ When `phase === 'train-arriving'` flips on, a vertical nav slides in on the righ
 - **Projects dropdown**: `<div className="side-nav-dropdown">` wrapping a `<button>` trigger and a `<div className="side-nav-sub">` panel. Expansion via `:hover`, `:focus-within`, OR a manual `.open` class toggled in the trigger's onClick (touch/keyboard). Sub-items use smaller bullets (0.5rem vs 0.7rem) and smaller font (1.9rem vs 3.1rem) at `opacity 0.85` to read as nested. When expanded, the sub-list adds `margin-top` equal to the parent `gap` so it sits visually centered between Projects and Blog.
 - HomePage passes `hideNav` to `<SiteHeader />` (see below) — only the Xp logo is rendered up top; this side-nav is the user's nav surface on the homepage.
 
-### Destination modal (HomePage)
+### Awaiting destination (HomePage) — replaces the old modal
 
-Once the board animation completes (or nav intercept fires — see *Shared nav* below), the user chooses where the train heads next.
+When the board animation completes and `pendingRoute` is null, phase flips to `awaiting-dest` instead of opening a modal. The previous two-level "Where to?" modal (`MAIN_DESTS` / `PROJECTS_SUB_DESTS` / `DEST_ROUTES`) was removed entirely; the right-edge **side-nav** is now the destination picker.
 
-- **Two-level modal**. State `destMenu: 'main' | 'projects'`:
-  - Main menu: `Projects (dropdown) / Gallery / Blog / Contact`. Projects is the only one with `sub: true` — clicking it switches `destMenu` to `'projects'` instead of departing.
-  - Projects submenu: `Personal Projects (/projects)` / `Work Projects (/work)` + a `← Back` button to return to main.
-- `destMenu` is reset to `'main'` every time `setShowDestination(true)` fires (in `onBoardComplete`), so a re-arrival always starts at the top.
-- Route mapping: `DEST_ROUTES` dict — keys are label strings, values are paths. `'Personal Projects' → '/projects'`, `'Work Projects' → '/work'`, `Gallery/Blog/Contact` → `/gallery / /blog / /contact` (those routes still don't exist, navigating there shows blank).
-- If `pendingRoute` is already set when the board animation completes (set by nav-dropdown intercept, see *Shared nav*), `onBoardComplete` skips the modal and jumps straight to `departing`.
+- A full-viewport `.side-nav-focus-dim` overlay (z=50, `rgba(0,0,0,0.45)` + `backdrop-filter: blur(2px)`) renders, dimming the platform/train/welcome behind.
+- Side-nav adds `.focused` class (z=60, scale 1.08, white text, white guide line) so it visually pops above the dim layer. Defined in `HomePage.css` keyframes `sideNavFocus`.
+- A click on any side-nav item in this state runs `setPendingRoute(path); setSideNavExiting(true); setPhase('departing')` — train slides off and `navigate(pendingRoute)` fires.
+- Robot is removed from DOM during `awaiting-dest` (already on the train) — same condition as `departing`.
+
+If `pendingRoute` was preselected via the side-nav before doors finished opening, `onBoardComplete` skips `awaiting-dest` and jumps straight to `departing` — same fast path as before.
 
 ### Shared nav (`src/components/SiteHeader.tsx`)
 
@@ -103,6 +104,9 @@ Used by HomePage / ProjectsPage / WorkProjectsPage — replaces the inline `<hea
 - Non-looping sprites call `onComplete` once and freeze on the last frame.
 - All props (`sprite`, `width`, `height`, `flipX`, `onComplete`) are mirrored into refs each render so the single rAF loop never needs to restart on prop changes — only `playing` and `sprite.src` changes restart the loop.
 - When a non-looping animation completes, the loop stops; it restarts when `sprite.src` changes (i.e. when the next animation is assigned).
+- **`frameYRamp`** (used by `boardTrain` and conceptually for jump): per-frame Y translate during a frame range. The ramp's `deltaY` is in **source-frame pixels**; SpriteAnimator multiplies by `canvas.height / sp.frameHeight` so the jump height tracks the rendered robot size automatically (responsive — the jump scales with `--ui-scale` without any extra plumbing).
+- **`jump`** SPRITE: `fps: 30` (doubled from the original 15), `frameYRamp.deltaY: -50` source-px (raised from -34). With heightScale, the visible jump arc on a 1440 baseline viewport is around 30 rendered px and scales up on larger viewports.
+- **`boardTrain`** SPRITE: `fps: 30`. The board sequence's "lift onto the train" arc is implemented via `frameYRamp.deltaY: -34` between frames 12-18, similarly scaled.
 
 ### Responsive scaling (`src/hooks/useUiScale.ts`)
 
@@ -116,12 +120,44 @@ The interactive scenes are scaled by a single factor `--ui-scale` injected as a 
 ### Assets
 
 - `src/Spritesheet/` — sprite sheet PNGs, imported directly via Vite in `SpriteAnimator.tsx` (hashed at build time)
-- `public/sprites/` — train and door images only (`Final_train.png` 4096×808, `door_panel_v3.png` 290×998 with alpha), referenced by URL string in `HomePage.tsx` / `ProjectsPage.tsx` via `${import.meta.env.BASE_URL}sprites/...` (so gh-pages subpaths work). The door PNG **has transparent edges** — never assume opaque coverage. Filename casing matters — gh-pages is case-sensitive.
+- `public/sprites/` — train, door, and platform images. `Final_train.png` 4096×808, `door_panel_v3.png` 290×998 with alpha, `platform.webp` ~10032×712 (illustrated platform with cream wall + golden tactile strip + gray facade). Referenced by URL string in `HomePage.tsx` / `ProjectsPage.tsx` / `WorkProjectsPage.tsx` via `${import.meta.env.BASE_URL}sprites/...` (so gh-pages subpaths work). The door PNG **has transparent edges** — never assume opaque coverage. Filename casing matters — gh-pages is case-sensitive.
 - `public/projects/` — 5 personal project covers + `to-be-continued.webp` (Figma exports, ~360 KB total after compression)
 - `public/work/` — 3 Ulanzi product WebPs for the work projects page (~128 KB total)
 - `scripts/compress-projects.mjs` — sharp-based one-shot script to convert `public/projects/*.png` → `*.webp` (width 1200, quality 80). Run via `node scripts/compress-projects.mjs` after dropping in new PNGs from Figma. The work-page assets were compressed with the same parameters but inline (no dedicated script).
 - `jump_spritesheet.png` is defined in `SPRITES` but not used on the homepage — used on ProjectsPage for the project-jump interaction
 - `public/bg.png` is **no longer referenced** — homepage background is plain white and the logo / nav / intro text are HTML
+
+### Platform & ground shadows (all three pages)
+
+The CSS-built platform divs (`platform-edge` / `platform-tactile` / `platform-floor`) were replaced with a single illustrated `platform.webp`.
+
+- **HomePage** renders a single `<img className="platform-img">` anchored to viewport bottom (`width: 100%; height: auto; bottom: 0; z-index: 0`).
+- **ProjectsPage / WorkProjectsPage** render a `.platform-row` *outside* `.scene` (so it sits at root z below the train) but mirrored to the same `translateX(${-cameraX}vw)` + `transition: transform 0.35s ease-out` as `.scene`. Inside `.platform-row`, multiple `<img className="platform-tile">` are placed at `left: ${i * 100}vw`, with **odd-index tiles mirrored via `transform: scaleX(-1)`** so the seams meet symmetrically (normal | flipped | normal | …). Tile count = `Math.ceil(SCENE_WIDTH_VW / 100)`.
+- **`PLATFORM_Y = 95`** on all three pages (was 88 with the CSS platform), tuned to land the robot's feet on the painted yellow strip. Robot/train/to-be-continued bottoms add a uniform `+45 * uiScale px` lift to fine-tune above the strip — when adjusting the platform image, retune this single constant in all three pages.
+- **z-index: 0** on `.platform-img` / `.platform-row` makes the platform the **bottommost layer**. Train (`.train-body` z=4 escapes via `.train-container` having no stacking context), scene (z=6), robot, side-nav, modal, etc. all sit above. Note: on Project pages, the platform must live OUTSIDE `.scene` because `.scene`'s z=6 would otherwise push the platform above `.train-body` (z=4) at root level.
+
+**Shadows** (added the same session as the platform image):
+
+- **Robot ground shadow**: a `<div className="robot-shadow">` child of `.robot-container`. Radial gradient ellipse (70px × 10px @ baseline, scaled by ui-scale), `z-index: -1` so it sits below the canvas. **Stays planted at the container's bottom** — when `boardTrain` / `jump` translates the canvas up via `frameYRamp`, the shadow does NOT follow vertically (canvas is the only thing that translates). The container itself only translates horizontally with `robotX`, so the shadow tracks horizontally but stays grounded vertically — reads as a real ground shadow.
+- **Per-anim shadow lift** (only on HomePage so far): `.robot-container.anim-{runLeft,runRight,turnLeft,turnRight} .robot-shadow { bottom: 8px }` (= 10px lift from default `-2px`); `anim-greeting .robot-shadow { bottom: 3px }` (5px lift). The `anim-${robotAnim}` class is set on `.robot-container` in TSX. On Project pages, only the running lift is applied.
+- **Train drop shadow**: `filter: drop-shadow()` on `.train-body` (two-layer — soft + tight), follows the train PNG's alpha channel so the shadow tracks the train shape exactly as it slides in/out.
+
+### Controls hint (above the robot's head)
+
+The `.controls-hint` text is rendered as a **child of `.robot-container`** on all three pages. It tracks the robot horizontally as it walks, anchored to the top of the container (just above the robot's head):
+
+```css
+.robot-container .controls-hint {
+  position: absolute;
+  bottom: calc(100% + 16px * var(--ui-scale));
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  opacity: 0.85;
+}
+```
+
+Conditional on `phase === 'free-roam' && robotAnim === 'idle'` (Project pages) or `showHint && robotAnim === 'idle'` (HomePage) — only shows when the robot is standing still, hides on any keyboard interaction. HomePage text: `← → to move · Space to board`. Project pages text: `← → move · Space or click card to open`.
 
 ### Styling
 
@@ -154,9 +190,9 @@ Flow:
 8. **Auto-walk to project 01 + camera follow** — kicked off the moment the disembark walk ends (step 4). The shared movement loop now runs from `doors-closing` onwards (not just `free-roam`) so the auto-walk drives the robot across the scene during steps 5–7. Camera-follow gate matches: only `train-entering / train-stopped / doors-opening / robot-exiting` lock cameraX = 0 — once disembark finishes, the camera follows the robot toward project 01 in parallel with the train leaving. The auto-walk uses `speedMul: 0.5` (half the default) so the cross-scene saunter visually matches the unhurried title fade.
 9. **Free-roam** — once auto-walk completes, robot stands at project 01 ready for input. Keyboard ←/→ or a/d moves at `MOVE_SPEED * 0.36`; the loop also gates keyboard input to `phase === 'free-roam'` so accidental keypresses during the auto-walk don't interfere.
 10. **Project entry — three ways**:
-    - **Space**: when robot is within 6vw of any project's `xVw`, plays jump animation → opens project detail modal.
+    - **Space**: when robot is within **16vw** of any project's `xVw` (Personal) or 12vw of `xVw + WORK_IMG_OFFSET_VW` (Work) — i.e. anywhere visually under the card image — plays jump animation → opens project detail modal. Threshold is the card image half-width: 27vw × scale 1.2 ÷ 2 ≈ 16vw on Personal; 76% × 27vw × 1.2 ÷ 2 ≈ 12vw on Work.
     - **Click card**: walks the robot to that project's `xVw` (or jumps immediately if already near), then jumps and opens detail. Cards have `role="button"`, `tabIndex` (when in free-roam), and `Enter` keyboard support.
-    - **Side-arrow buttons** (`.nav-arrow-left/right`, viewport-fixed): step to the prior/next nearest project at `speedMul: 1.5` (faster than auto/manual walk). Buttons disable at scene edges.
+    - **Side-arrow buttons** (`.nav-arrow-left/right`, viewport-fixed): step to the prior/next nearest project at `speedMul: 2` (faster than auto/manual walk; was 1.5). Card click also uses `speedMul: 2` so click-to-walk feels equally snappy. Buttons disable at scene edges.
     Esc or click-outside the modal closes it.
 
 Key coordinates:
@@ -164,7 +200,7 @@ Key coordinates:
 - Train position (`trainX`) stays in **viewport %** because the train is rendered outside `.scene`.
 - Door center helper `getDoorCenterPercent() = trainX + 0.835 * 95` is in viewport % (same formula as HomePage). It's used only during the train-still-on-screen phases, when camera is still at 0, so viewport-vw ≈ scene-vw at that moment.
 - Project xVw values: `30, 77.5, 125, 172.5, 220` (47.5vw apart). To Be Continued sign at `265vw`.
-- Robot baseline is `bottom: calc(${100 - PLATFORM_Y}% - 3px)` (3px below platform line) — Projects-page-only fine-tune, doesn't apply to train/cards.
+- Robot baseline is `bottom: calc(${100 - PLATFORM_Y}% - 3px + ${45 * uiScale}px)` (3px below platform line + 45px lift to match the painted yellow strip in `platform.webp`) — Projects-page-only fine-tune, doesn't apply to train/cards. The +45px lift is mirrored by train and to-be-continued sign.
 
 Card layout (matches Figma Desk-3/4):
 - Each `.project-card` width 27vw (no max-width cap — removed during responsive-scaling fix), `transform: translateX(-50%) scale(1.2)` with `transform-origin: top center`

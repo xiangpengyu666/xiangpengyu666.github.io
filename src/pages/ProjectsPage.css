@@ -165,24 +165,35 @@
   will-change: transform;
 }
 
-/* ═══ Platform — spans entire scene ═══ */
-.platform {
+/* ═══ Platform — illustrated tiles, scene-spanning ═══
+   Lives OUTSIDE .scene at the page root, so its z=0 actually sits beneath
+   the train (z=4) — but mirrors the camera's translateX inline so it still
+   pans with the rest of the world. Multiple <img> tiles are placed side-by-
+   side; odd-index tiles are mirrored via scaleX(-1) so each seam meets a
+   symmetrical edge (normal | flipped | normal | …).
+   PLATFORM_Y in TSX is tuned to land the robot's feet on the yellow strip. */
+.platform-row {
   position: absolute;
   left: 0;
-  right: 0;
-  width: 100%;
-  z-index: 3;
+  bottom: 0;
+  /* Width is set inline (= SCENE_WIDTH_VW vw). */
+  /* Match the natural aspect of one tile sized at 100vw width:
+     100vw / 14.09 ≈ 7.10vw tall. */
+  height: calc(100vw / 14.09);
+  /* Bottommost layer at the page root — train (z=4), scene (z=6) and the
+     side-nav, modal, etc. all paint above. */
+  z-index: 0;
+  pointer-events: none;
+  transition: transform 0.35s ease-out;
 }
 
-.platform-edge {
-  height: 4px;
-  background: #333;
-}
-
-.platform-floor {
-  height: 12vh;
-  background: linear-gradient(180deg, #f0f0f0, #e0e0e0);
-  border-top: 1px solid #ccc;
+.platform-tile {
+  position: absolute;
+  bottom: 0;
+  width: 100vw;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* ═══ Project cards row ═══ */
@@ -286,6 +297,9 @@
   display: block;
   position: relative;
   z-index: 4;
+  filter:
+    drop-shadow(0 calc(6px * var(--ui-scale)) calc(10px * var(--ui-scale)) rgba(0, 0, 0, 0.28))
+    drop-shadow(0 calc(2px * var(--ui-scale)) calc(3px * var(--ui-scale)) rgba(0, 0, 0, 0.18));
 }
 
 .train-doors {
@@ -331,6 +345,35 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* Ground shadow — same recipe as HomePage. Stays planted at the container's
+   bottom so jump animations (which translate the canvas up) leave it on
+   the platform line. */
+.robot-shadow {
+  position: absolute;
+  bottom: calc(-2px * var(--ui-scale));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(70px * var(--ui-scale));
+  height: calc(10px * var(--ui-scale));
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.32) 0%,
+    rgba(0, 0, 0, 0.18) 40%,
+    rgba(0, 0, 0, 0) 75%
+  );
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(0.5px);
+}
+
+/* Lift shadow slightly while running so it reads as foot-shadow stride. */
+.robot-container.anim-runLeft .robot-shadow,
+.robot-container.anim-runRight .robot-shadow,
+.robot-container.anim-turnLeft .robot-shadow,
+.robot-container.anim-turnRight .robot-shadow {
+  bottom: calc(8px * var(--ui-scale));
 }
 
 /* ═══ Project card hover (clickable) ═══ */
@@ -412,6 +455,19 @@
   font-size: 0.7rem;
   margin: 0 0.2rem;
   color: #555;
+}
+
+/* When the hint is rendered as a child of .robot-container, anchor it above
+   the robot's head (instead of viewport-bottom-centered). It tracks the
+   robot horizontally as it walks because the container's left/transform
+   already place us at the robot's position. */
+.robot-container .controls-hint {
+  position: absolute;
+  bottom: calc(100% + 16px * var(--ui-scale));
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  opacity: 0.85;
 }
 
 /* ═══ Project detail modal ═══ */

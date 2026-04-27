@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code workspace + scratch image folder
+.claude/
+给claude看图/

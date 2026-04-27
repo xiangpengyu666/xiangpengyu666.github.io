@@ -39,7 +39,7 @@ export const SPRITES: Record<string, SpriteConfig> = {
   jump: {
     src: jumpSrc,
     frameWidth: 455, frameHeight: 256,
-    columns: 9, totalFrames: 54, fps: 15, loop: false,
+    columns: 9, totalFrames: 54, fps: 30, loop: false,
     yOffset: 10,
   },
   boardTrain: {
@@ -49,7 +49,7 @@ export const SPRITES: Record<string, SpriteConfig> = {
     scale: 0.9,
     xOffset: 6,
     yOffset: 0,
-    frameYRamp: { startFrame: 12, endFrame: 18, deltaY: -34 },
+    frameYRamp: { startFrame: 12, endFrame: 18, deltaY: -50 },
   },
   runRight: {
     src: runRightSrc,
@@ -163,7 +163,10 @@ export default function SpriteAnimator({
           let extraY = 0;
           if (f >= endFrame) extraY = deltaY;
           else if (f > startFrame) extraY = deltaY * ((f - startFrame) / (endFrame - startFrame));
-          canvas.style.transform = `translateY(${extraY}px)`;
+          // Scale by rendered/source height ratio so the jump height tracks
+          // the robot's on-screen size (deltaY is authored in source pixels).
+          const heightScale = canvas.height / sp.frameHeight;
+          canvas.style.transform = `translateY(${extraY * heightScale}px)`;
         } else if (canvas.style.transform) {
           canvas.style.transform = '';
         }

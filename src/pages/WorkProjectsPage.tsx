@@ -32,7 +32,7 @@ type Phase =
 type RobotAnim = 'idle' | 'turnLeft' | 'runLeft' | 'turnRight' | 'runRight' | 'jump' | 'boardTrain';
 
 const ROBOT_SIZE = 130;
-const PLATFORM_Y = 88;
+const PLATFORM_Y = 95;
 const MOVE_SPEED = 0.5;
 // Keep in sync with --train-scale in WorkProjectsPage.css
 const TRAIN_SCALE = 1.25;
@@ -232,8 +232,10 @@ export default function WorkProjectsPage() {
       keysRef.current.add(e.key);
       if (e.key === ' ' && phase === 'free-roam') {
         e.preventDefault();
-        // Check if robot is near any project's visible image center (within 6vw)
-        const near = PROJECTS.find(p => Math.abs((p.xVw + WORK_IMG_OFFSET_VW) - robotX) < 6);
+        // Robot triggers a jump anywhere under the (left-aligned, square)
+        // card image. Image width ≈ 76% × 27vw × scale 1.2 ≈ 24.6vw, so
+        // half-width ≈ 12vw from the image's visible center.
+        const near = PROJECTS.find(p => Math.abs((p.xVw + WORK_IMG_OFFSET_VW) - robotX) < 12);
         if (near) {
           setActiveProject(near);
           setRobotAnim('jump');
@@ -403,11 +405,11 @@ export default function WorkProjectsPage() {
       if (dir === 'right' && projectTargetVw(PROJECTS[idx]) < robotXRef.current && idx < PROJECTS.length - 1) nextIdx = idx + 1;
     }
     if (nextIdx < 0 || nextIdx >= PROJECTS.length) return;
-    walkToProject(PROJECTS[nextIdx], false, 1.5);
+    walkToProject(PROJECTS[nextIdx], false, 2);
   }, [getNearestProjectIndex, walkToProject]);
 
   const onCardClick = useCallback((proj: typeof PROJECTS[number]) => {
-    walkToProject(proj, true);
+    walkToProject(proj, true, 2);
   }, [walkToProject]);
 
   const getCurrentSprite = () => {
@@ -444,6 +446,31 @@ export default function WorkProjectsPage() {
         <h1>Welcome to Xiangpeng's work projects</h1>
       </div>
 
+      {/* Platform — illustrated tiles spliced across the scene. Lives OUTSIDE
+          .scene (so it sits below the train at the root z-stack) but mirrors
+          the camera's translateX so it still pans with the rest of the world.
+          Odd-index tiles are mirrored (scaleX(-1)) for symmetric seams. */}
+      <div
+        className="platform-row"
+        style={{
+          width: `${SCENE_WIDTH_VW}vw`,
+          transform: `translateX(${-cameraX}vw)`,
+        }}
+      >
+        {Array.from({ length: Math.ceil(SCENE_WIDTH_VW / 100) }, (_, i) => (
+          <img
+            key={i}
+            className="platform-tile"
+            src={`${import.meta.env.BASE_URL}sprites/platform.webp`}
+            alt=""
+            style={{
+              left: `${i * 100}vw`,
+              transform: i % 2 === 1 ? 'scaleX(-1)' : 'none',
+            }}
+          />
+        ))}
+      </div>
+
       {/* Scrollable scene — camera translates this container */}
       <div
         className="scene"
@@ -452,12 +479,6 @@ export default function WorkProjectsPage() {
           transform: `translateX(${-cameraX}vw)`,
         }}
       >
-        {/* Platform */}
-        <div className="platform" style={{ top: `${PLATFORM_Y}%` }}>
-          <div className="platform-edge" />
-          <div className="platform-floor" />
-        </div>
-
         {/* Project cards */}
         <div className={`projects-row ${cardsVisible ? 'visible' : ''}`}>
           {PROJECTS.map(p => (
@@ -482,7 +503,7 @@ export default function WorkProjectsPage() {
         {/* To Be Continued sign — shared with personal projects page */}
         <div
           className={`to-be-continued ${cardsVisible ? 'visible' : ''}`}
-          style={{ left: `${TO_BE_CONTINUED_X_VW}vw`, bottom: `${100 - PLATFORM_Y}%` }}
+          style={{ left: `${TO_BE_CONTINUED_X_VW}vw`, bottom: `calc(${100 - PLATFORM_Y}% + ${45 * uiScale}px)` }}
         >
           <img src={`${import.meta.env.BASE_URL}projects/to-be-continued.webp`} alt="To Be Continued" />
         </div>
@@ -490,13 +511,19 @@ export default function WorkProjectsPage() {
         {/* Robot — positioned in scene coordinates */}
         {robotVisible && (
           <div
-            className="robot-container"
+            className={`robot-container anim-${robotAnim}`}
             style={{
               left: `${robotX}vw`,
-              bottom: `calc(${100 - PLATFORM_Y}% - 3px)`,
+              bottom: `calc(${100 - PLATFORM_Y}% - 3px + ${45 * uiScale}px)`,
               transform: `translateX(calc(-50% + ${xOffset * uiScale + robotDxPx}px)) translateY(${yOffset * uiScale + robotDyPx}px)`,
             }}
           >
+            <div className="robot-shadow" />
+            {phase === 'free-roam' && robotAnim === 'idle' && (
+              <div className="controls-hint">
+                <kbd>←</kbd> <kbd>→</kbd> move · <kbd>Space</kbd> or click card to open
+              </div>
+            )}
             <SpriteAnimator
               sprite={currentSprite}
               width={ROBOT_SIZE * uiScale * scale * aspectRatio}
@@ -521,7 +548,7 @@ export default function WorkProjectsPage() {
           className="train-container"
           style={{
             left: `${trainX}%`,
-            bottom: `calc(${100 - PLATFORM_Y}% - ${5 * uiScale}px)`,
+            bottom: `calc(${100 - PLATFORM_Y}% - ${5 * uiScale}px + ${45 * uiScale}px)`,
             // No stacking context, so .train-doors' z-index escapes and competes
             // directly with .scene (z 6) for proper layering with the robot.
             zIndex: 'auto',
@@ -581,13 +608,6 @@ export default function WorkProjectsPage() {
           </>
         );
       })()}
-
-      {/* Controls hint */}
-      {phase === 'free-roam' && (
-        <div className="controls-hint">
-          <kbd>←</kbd> <kbd>→</kbd> move · <kbd>Space</kbd> or click card to open
-        </div>
-      )}
 
       {/* Project detail — shared Behance-style modal + per-project slide stack */}
       {activeProject && phase === 'project-detail' && (() => {

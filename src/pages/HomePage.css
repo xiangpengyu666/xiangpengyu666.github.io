@@ -217,23 +217,22 @@
 }
 
 /* ═══ Platform ═══ */
-.platform {
+/* Platform — illustrated image anchored to viewport bottom. Width 100% so
+   the image always spans the screen, height auto preserves the source's
+   8.59:1 aspect. PLATFORM_Y (in TSX) is tuned so the robot's feet line up
+   with the yellow tactile strip painted in the image. */
+.platform-img {
   position: absolute;
   left: 0;
   right: 0;
-  z-index: 3;
-}
-
-.platform-edge {
-  height: 4px;
-  background: #333;
-  box-shadow: none;
-}
-
-.platform-floor {
-  height: 12vh;
-  background: linear-gradient(180deg, #f0f0f0, #e0e0e0);
-  border-top: 1px solid #ccc;
+  bottom: 0;
+  width: 100%;
+  height: auto;
+  /* Bottommost layer — every other positioned element (train, robot, doors,
+     welcome, side-nav, etc.) sits above. */
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* ═══ Train ═══ */
@@ -252,6 +251,11 @@
   display: block;
   position: relative;
   z-index: 4;
+  /* drop-shadow follows the train PNG's alpha — shadow tracks the train as
+     it slides across the platform without needing extra DOM. */
+  filter:
+    drop-shadow(0 calc(6px * var(--ui-scale)) calc(10px * var(--ui-scale)) rgba(0, 0, 0, 0.28))
+    drop-shadow(0 calc(2px * var(--ui-scale)) calc(3px * var(--ui-scale)) rgba(0, 0, 0, 0.18));
 }
 
 .train-doors {
@@ -304,6 +308,41 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* Robot ground shadow — sits at the container's bottom (the platform line)
+   and stays there even when the canvas translates up during the jump,
+   reading as a proper "ground" shadow instead of a glued one. */
+.robot-shadow {
+  position: absolute;
+  bottom: calc(-2px * var(--ui-scale));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(70px * var(--ui-scale));
+  height: calc(10px * var(--ui-scale));
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.32) 0%,
+    rgba(0, 0, 0, 0.18) 40%,
+    rgba(0, 0, 0, 0) 75%
+  );
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(0.5px);
+}
+
+/* While running, lift the shadow 10px so it sits a touch closer to the
+   robot's feet during stride. Idle/jump/board keep the grounded position. */
+.robot-container.anim-runLeft .robot-shadow,
+.robot-container.anim-runRight .robot-shadow,
+.robot-container.anim-turnLeft .robot-shadow,
+.robot-container.anim-turnRight .robot-shadow {
+  bottom: calc(8px * var(--ui-scale));
+}
+
+/* Greeting — slight 5px lift to match the standing pose. */
+.robot-container.anim-greeting .robot-shadow {
+  bottom: calc(3px * var(--ui-scale));
 }
 
 /* ═══ Hint Bubble ═══ */
@@ -380,6 +419,47 @@
   width: 1px;
   background: #1a1a1a;
   opacity: 0.55;
+}
+
+/* When the robot has boarded and the page is waiting for the user to pick
+   a destination, scale the side-nav up slightly + glow it so attention
+   shifts there. The dim overlay sits below this z-index. */
+.side-nav.focused {
+  z-index: 60;
+  animation: sideNavFocus 0.6s ease forwards;
+}
+
+@keyframes sideNavFocus {
+  from { transform: translateY(-50%) scale(1); }
+  to   { transform: translateY(-50%) scale(1.08); }
+}
+
+/* Dim background ⇒ flip nav text to light so it stays legible */
+.side-nav.focused a,
+.side-nav.focused .side-nav-trigger {
+  color: #fff;
+}
+.side-nav.focused::before {
+  background: #fff;
+  opacity: 0.6;
+}
+.side-nav.focused .side-nav-sub::before {
+  background: #fff;
+  opacity: 0.5;
+}
+
+.side-nav-focus-dim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 50;
+  animation: focusDimIn 0.5s ease forwards;
+}
+
+@keyframes focusDimIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .side-nav.exiting {
@@ -541,6 +621,17 @@
   color: #888;
   z-index: 20;
   opacity: 0.8;
+}
+
+/* When rendered as a child of .robot-container, anchor the hint above the
+   robot's head — matches the ProjectsPage treatment. */
+.robot-container .controls-hint {
+  position: absolute;
+  bottom: calc(100% + 16px * var(--ui-scale));
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  opacity: 0.85;
 }
 
 .controls-hint kbd {
