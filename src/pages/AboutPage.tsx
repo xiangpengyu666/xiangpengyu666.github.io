@@ -125,6 +125,7 @@ export default function AboutPage() {
   const [titlePhase, setTitlePhase] = useState<'hidden' | 'in' | 'out' | 'done'>('hidden');
 
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set([0]));
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   // Splash title sequence — kicks off the moment the robot freezes (parallel
   // with doors closing + train leaving).
   useEffect(() => {
@@ -362,15 +363,26 @@ export default function AboutPage() {
           style={{ ['--rd' as string]: `${revealDelayMs(850)}ms` } as CSSProperties}
         />
 
-        {/* Dots — left positions: 1011/1425/1839/2253 */}
-        {[1011, 1425, 1839, 2253].map((x, i) => (
-          <div
-            key={`dot-${i}`}
-            className={`fc-dot d${i + 1} reveal`}
-            aria-hidden
-            style={{ ['--rd' as string]: `${revealDelayMs(x)}ms` } as CSSProperties}
-          />
-        ))}
+        {/* Dots — left positions: 1011/1425/1839/2253 — clickable, same toggle as label */}
+        {[1011, 1425, 1839, 2253].map((x, i) => {
+          const active = expanded.has(i);
+          return (
+            <button
+              key={`dot-${i}`}
+              type="button"
+              className={`fc-dot d${i + 1} reveal${active ? ' is-active' : ''}${hoverIdx === i ? ' is-hover' : ''}`}
+              onClick={() => toggleExpand(i)}
+              onMouseEnter={() => setHoverIdx(i)}
+              onMouseLeave={() => setHoverIdx(prev => (prev === i ? null : prev))}
+              onFocus={() => setHoverIdx(i)}
+              onBlur={() => setHoverIdx(prev => (prev === i ? null : prev))}
+              aria-expanded={active}
+              aria-controls={`fc-desc-${i}`}
+              aria-label={TIMELINE[i].label}
+              style={{ ['--rd' as string]: `${revealDelayMs(x)}ms` } as CSSProperties}
+            />
+          );
+        })}
 
         {/* Place blocks — figma center x: 1028.5, 1442.5, 1856.5, 2270.5 */}
         {TIMELINE.map((entry, i) => {
@@ -398,8 +410,12 @@ export default function AboutPage() {
             <button
               key={entry.label}
               type="button"
-              className={`fc-label l${i + 1} reveal${active ? ' is-active' : ''}`}
+              className={`fc-label l${i + 1} reveal${active ? ' is-active' : ''}${hoverIdx === i ? ' is-hover' : ''}`}
               onClick={() => toggleExpand(i)}
+              onMouseEnter={() => setHoverIdx(i)}
+              onMouseLeave={() => setHoverIdx(prev => (prev === i ? null : prev))}
+              onFocus={() => setHoverIdx(i)}
+              onBlur={() => setHoverIdx(prev => (prev === i ? null : prev))}
               aria-expanded={active}
               aria-controls={`fc-desc-${i}`}
               style={{ ['--rd' as string]: `${revealDelayMs(cx) + 80}ms` } as CSSProperties}

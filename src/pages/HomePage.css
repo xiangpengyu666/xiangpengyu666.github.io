@@ -479,10 +479,10 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: calc(1.1rem * var(--ui-scale));
+  gap: calc(1.1rem * var(--ui-scale) + 20px * var(--ui-scale));
   font-family: var(--font-fahkwang);
   font-size: calc(3.1rem * var(--ui-scale));
-  font-weight: 500;
+  font-weight: 400;
   color: #1a1a1a;
   text-decoration: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -518,10 +518,10 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: calc(1.1rem * var(--ui-scale));
+  gap: calc(1.1rem * var(--ui-scale) + 20px * var(--ui-scale));
   font-family: var(--font-fahkwang);
   font-size: calc(3.1rem * var(--ui-scale));
-  font-weight: 500;
+  font-weight: 400;
   color: #1a1a1a;
   background: none;
   border: none;

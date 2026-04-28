@@ -25,7 +25,8 @@
 }
 
 /* Re-enable pointer events on interactive bits */
-.figma-canvas .fc-label { pointer-events: auto; }
+.figma-canvas .fc-label,
+.figma-canvas .fc-dot { pointer-events: auto; }
 
 /* ═══ Reveal animation — pure opacity fade, staggered via --rd.
    No transform on the generic .reveal so per-element layout transforms
@@ -140,11 +141,31 @@
   width: calc(35 * var(--fpx));
   height: calc(35 * var(--fpx));
   top: calc(495 * var(--fpx));
+  padding: 0;
+  border: none;
   border-radius: 50%;
   background: #F2D18B;
   box-shadow:
     0 0 0 calc(4 * var(--fpx)) rgba(242, 209, 139, 0.25),
     0 0 calc(12 * var(--fpx)) rgba(242, 209, 139, 0.45);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fc-dot:hover,
+.fc-dot.is-hover {
+  transform: translateY(calc(-2 * var(--fpx))) scale(1.08);
+  box-shadow:
+    0 0 0 calc(5 * var(--fpx)) rgba(242, 209, 139, 0.3),
+    0 0 calc(18 * var(--fpx)) calc(2 * var(--fpx)) rgba(242, 209, 139, 0.5),
+    0 0 calc(32 * var(--fpx)) calc(4 * var(--fpx)) rgba(242, 209, 139, 0.25);
+}
+
+.fc-dot:focus-visible {
+  outline: calc(2 * var(--fpx)) solid #000;
+  outline-offset: calc(3 * var(--fpx));
 }
 
 .fc-dot.d1 { left: calc(1011 * var(--fpx)); }
@@ -204,7 +225,8 @@
 
 .fc-label.is-active { color: #000; }
 
-.fc-label:hover {
+.fc-label:hover,
+.fc-label.is-hover {
   color: #000;
   transform: translateX(-50%) translateY(calc(-2 * var(--fpx)));
 }
@@ -284,7 +306,7 @@
 .about-splash-title h1 {
   font-family: var(--font-fahkwang);
   font-size: calc(4rem * var(--ui-scale));
-  font-weight: 600;
+  font-weight: 400;
   color: #000;
   letter-spacing: -0.01em;
   margin: 0;
