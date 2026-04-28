@@ -48,7 +48,7 @@
 }
 
 .site-nav a {
-  font-family: var(--font-body);
+  font-family: var(--font-puhui);
   font-size: calc(1.05rem * var(--ui-scale));
   font-weight: 500;
   color: #1a1a1a;
@@ -67,7 +67,7 @@
 }
 
 .nav-dropdown-trigger {
-  font-family: var(--font-body);
+  font-family: var(--font-puhui);
   font-size: calc(1.05rem * var(--ui-scale));
   font-weight: 500;
   color: #1a1a1a;
@@ -115,7 +115,7 @@
 
 .nav-dropdown-panel a,
 .nav-dropdown-panel button {
-  font-family: var(--font-body);
+  font-family: var(--font-puhui);
   font-size: calc(0.95rem * var(--ui-scale));
   font-weight: 500;
   color: #1a1a1a;
@@ -147,7 +147,7 @@
 }
 
 .projects-title h1 {
-  font-family: var(--font-puhui);
+  font-family: var(--font-fahkwang);
   font-size: calc(4rem * var(--ui-scale));
   font-weight: 400;
   color: #000;
