@@ -123,6 +123,7 @@ The interactive scenes are scaled by a single factor `--ui-scale` injected as a 
 - `public/sprites/` — train, door, and platform images. `Final_train.png` 4096×808, `door_panel_v3.png` 290×998 with alpha, `platform.webp` ~10032×712 (illustrated platform with cream wall + golden tactile strip + gray facade). Referenced by URL string in `HomePage.tsx` / `ProjectsPage.tsx` / `WorkProjectsPage.tsx` via `${import.meta.env.BASE_URL}sprites/...` (so gh-pages subpaths work). The door PNG **has transparent edges** — never assume opaque coverage. Filename casing matters — gh-pages is case-sensitive.
 - `public/projects/` — 5 personal project covers + `to-be-continued.webp` (Figma exports, ~360 KB total after compression)
 - `public/work/` — 3 Ulanzi product WebPs for the work projects page (~128 KB total)
+- `public/about/portrait.webp` — single 1200×1200 portrait used by AboutPage (`image 495` from Figma `162:64`, compressed via inline sharp call)
 - `scripts/compress-projects.mjs` — sharp-based one-shot script to convert `public/projects/*.png` → `*.webp` (width 1200, quality 80). Run via `node scripts/compress-projects.mjs` after dropping in new PNGs from Figma. The work-page assets were compressed with the same parameters but inline (no dedicated script).
 - `jump_spritesheet.png` is defined in `SPRITES` but not used on the homepage — used on ProjectsPage for the project-jump interaction
 - `public/bg.png` is **no longer referenced** — homepage background is plain white and the logo / nav / intro text are HTML
@@ -165,6 +166,7 @@ Conditional on `phase === 'free-roam' && robotAnim === 'idle'` (Project pages) o
 - Global CSS variables in `src/styles/global.css`:
   - `--font-display: 'Instrument Serif'`, `--font-body: 'DM Sans'`, `--font-mono: 'JetBrains Mono'`, `--font-script: 'Caveat'` (used for the Xp logo) — all loaded via Google Fonts (in `index.html`)
   - `--font-puhui: 'Alibaba PuHuiTi 3.0 55 Regular'`, `--font-puhui-semibold: 'Alibaba PuHuiTi 3.0 75 SemiBold'` — loaded via cn-fontsource CDN (in `index.html`), used on ProjectsPage to match Figma typography
+  - `--font-fahkwang: 'Fahkwang'` — loaded via Google Fonts (weights 400/500/600/700), used **only** on AboutPage (`AboutPage.css`)
 
 ### Personal Projects page — `ProjectsPage.tsx` (route: `/projects`)
 
@@ -224,9 +226,64 @@ Routing: user on HomePage → destination modal → Projects → Work Projects �
 
 **Same auto-walk + click-to-jump + arrow nav as Personal Projects** — the post-disembark autoWalkRef-to-project-01, the card onClick, and the side `nav-arrow` buttons are mirrored. One Work-only twist: because the thumb is left-aligned within the card, the **visible image center is offset ~3.88vw to the LEFT of the card's `xVw` anchor**. `WORK_IMG_OFFSET_VW = -3.88` is applied wherever a project's target position is computed (`projectTargetVw(p)`, the Space-key proximity check, the disembark auto-walk target, and the arrow-nav `canLeft/canRight` math) so the robot lands directly under the visible image, not under the card's geometric center.
 
+### About page — `AboutPage.tsx` (route: `/about`)
+
+Third destination in the train-journey narrative. Source: Figma `162:64` (canvas "about me"), specifically frame **01** (`166:277`) for the initial state and frame **02** (`166:214`) for the fully-expanded state.
+
+**Layout system — Figma-coord absolute positioning**
+
+Every visible content element is positioned in raw Figma coordinates from the 2559×1347 baseline frame. A single CSS variable `--fpx: calc(100vw / 2559)` converts 1 Figma px → vw, so all `left/top/width/height/font-size` are written as `calc(N * var(--fpx))`. The `.figma-canvas` wrapper is `100vw × calc(100vw * 1347/2559)` — preserves Figma aspect, scales linearly with viewport width.
+
+Specific coords baked into `AboutPage.css`:
+- White card (Rectangle 1): 78, 198, 1328×430
+- Portrait: 109, 215, 595×595, border-radius 35
+- "About me" h1: 109, 877 (72px Fahkwang SemiBold)
+- Quote: 109, 992 (36px Fahkwang Regular italic)
+- "Experience": 840, 198 (60px Fahkwang SemiBold)
+- Horizontal connector line: 850.75, 511.25, 1598.5×1px
+- 4 dots at x=1011/1425/1839/2253, y=495, 35×35 (color `#F2D18B` w/ glow)
+- 4 place blocks centered at x=1028.5/1442.5/1856.5/2270.5, y=368 (20px)
+- 4 labels centered at x=1029.5/1443.5/1856.5/2270.5, y=551 (36px)
+- 4 vertical ticks at x=1028/1443/1857/2271, y=625, h=60
+- 4 descriptions at x=859/1277/1695/2122, y=714 (16px)
+
+**Phase machine — entry sequence** (no keyboard input — fully scripted)
+
+```
+train-entering → train-stopped → doors-opening → robot-exiting
+  → walking-to-center → boarding-turn → frozen
+```
+
+1. **Train entry** — slides in from left to `-77%` (mirrors HomePage/ProjectsPage entry, lerp 0.04, ~4s)
+2. **Doors open + robot appears at door** — robot raised 31px (sitting on train floor), doors slide open (700ms), 500ms idle hold
+3. **Disembark mini-walk** — robot `runRight` + 40px right + step down 31px over 750ms
+4. **Auto-walk to center** — robot continues `runRight` toward viewport 50%. Speed = `AUTO_SPEED = 0.125` % per rAF frame (slower than ProjectsPage, tuned for an unhurried saunter)
+5. **Board-turn freeze** — robot plays `BOARD_FLAT_SPRITE` (custom config = `{...SPRITES.boardTrain, totalFrames: 12, frameYRamp: undefined}`). The truncation drops boardTrain's frames 12-47 (the lift + boarding-into-train portion); only the turn-around frames play. Robot freezes on frame 11 = back-facing pose. **Don't extend `totalFrames` past 12 — the lift starts at frame 12 and the user explicitly didn't want vertical motion.**
+6. **Frozen** — three things kick off in parallel:
+   - Doors close (700ms)
+   - Train slides off-screen right at 70 %/s → sets `trainGone = true` on completion
+   - **Splash title** "About me" sequence (mirrors ProjectsPage's welcome banner): 200ms pre-delay → 450ms fade-in → **1900ms** hold → 450ms fade-out → `titlePhase = 'done'`. Note: hold is longer than ProjectsPage's 900ms because the user explicitly extended dwell time.
+7. **Content reveals L→R** — gated on `titlePhase === 'done' && trainGone` (whichever finishes last). Each Figma element gets a `--rd` reveal-delay = `revealDelayMs(figmaX) = round(figmaX / 2559 * 2400)` ms — leftmost element delay 0, rightmost ~2400ms. Elements fade in via opacity-only transition (0.7s ease). Per-column ordering: dot → place → label → tick + desc (tick + desc add a `TAIL_OFFSET_MS = 220` to come last).
+8. **Reveal-done** — after 3.6s, set `revealDone = true` → `.about-page.reveal-done` class clears all `transition-delay`s so subsequent user-triggered toggles don't lag.
+
+**Timeline interaction (post-reveal)**
+
+The 4 columns (Design / Engineering / Industry / Robotics & AI) match Figma frame 01's initial state: only **Design** is "expanded" by default (`expanded` state initialized to `new Set([0])`). Each label is rendered as a `<button>` with `onClick={() => toggleExpand(i)}` — toggles the column's expansion (no single-select, can have multiple expanded simultaneously).
+
+CSS states:
+- **Collapsed**: place name + label both `color: #9b9b9b` (gray), no tick or description visible
+- **Hover** (label only): `color: #000` + `translateY(-2 * --fpx)` (2-figma-px lift)
+- **Active**: place name + label `color: #000`, tick `scaleY(1)` (springs in over 0.3s), description `opacity: 1` (fades in 0.4s)
+- **Pre-reveal gating**: tick + desc rules require `.about-page.is-revealing` parent — so during the train sequence, even Design's tick/desc stay hidden until the reveal phase starts
+
+**Robot sprite picker** — only 3 anims used (no jump, no greeting, no manual movement):
+- `idle`, `runRight`, `boardTurn` (= `BOARD_FLAT_SPRITE`)
+
+**Reused styles** — train (`.train-container`, `.train-doors`, `.door-panel`), platform (single `.about-platform` img anchored viewport-bottom), site header are all loaded via shared CSS imported through `App.tsx` (HomePage.css is bundled at app start, so `.train-*` rules are globally available). AboutPage doesn't re-declare them.
+
 ### Figma integration
 
-- Design source: `https://www.figma.com/design/p2GCd0gwGPpBWnRlsDN81M/NEW_PORTFOLIO` — three frames on Page 3 (`106:9952`): **Desk-5** (welcome title), **Desk-3** (projects row 01–04), **Desk-4** (project 05 + "To Be Continued" composite).
+- Design source: `https://www.figma.com/design/p2GCd0gwGPpBWnRlsDN81M/NEW_PORTFOLIO` — three frames on Page 3 (`106:9952`): **Desk-5** (welcome title), **Desk-3** (projects row 01–04), **Desk-4** (project 05 + "To Be Continued" composite). About page lives on a separate canvas `162:64` ("about me") with frames **01** (`166:277`) and **02** (`166:214`).
 - The `claude.ai Figma` MCP (remote) can do `get_screenshot` and `get_metadata` with explicit nodeId/fileKey. `get_design_context` (the rich version that returns React+Tailwind reference code, asset URLs, design tokens) requires a layer to be **selected in Figma desktop** — when calling it, ask the user to select the target frame first.
 - Asset URLs returned by `get_design_context` (e.g. `https://www.figma.com/api/mcp/asset/...`) expire after **7 days** — download immediately, then run `node scripts/compress-projects.mjs` to convert to WebP.
 
@@ -261,7 +318,7 @@ Each project's slides live at `public/<projects|work>/<slug>/slides/NN.webp`, na
 
 ### Planned pages (stubs in destination modal + nav)
 
-`/about`, `/gallery`, `/blog`, `/contact` — both the destination modal and the nav dropdown's non-Projects items route there, but the routes aren't registered in `App.tsx` yet. Clicking them plays the full boarding animation and then lands on a blank screen. When building these pages, register them in `App.tsx` alongside the existing `/`, `/projects`, `/work`.
+`/blog`, `/contact` — nav dropdown items route there, but the routes aren't registered in `App.tsx`. Clicking them plays the full boarding animation and then lands on a blank screen. When building these pages, register them in `App.tsx` alongside the existing `/`, `/about`, `/projects`, `/work`.
 
 ### ⚠ TODO — remind the user next session
 

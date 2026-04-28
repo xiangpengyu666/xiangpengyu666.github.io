@@ -1,0 +1,343 @@
+/* Figma source frame: 2559 × 1347. Every value below is the literal Figma
+   coord, multiplied by --fpx (1 figma px expressed in current viewport vw). */
+.about-page {
+  --ui-scale: 1;
+  --train-scale: 1.25;
+  --fpx: calc(100vw / 2559);
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  font-family: var(--font-fahkwang);
+  color: #000;
+}
+
+/* ═══ Figma canvas ═══ */
+.figma-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: calc(100vw * 1347 / 2559);
+  z-index: 5;
+  pointer-events: none;  /* re-enabled per-button below */
+}
+
+/* Re-enable pointer events on interactive bits */
+.figma-canvas .fc-label { pointer-events: auto; }
+
+/* ═══ Reveal animation — pure opacity fade, staggered via --rd.
+   No transform on the generic .reveal so per-element layout transforms
+   (translateX(-50%), scale, scaleX) keep working untouched. */
+.reveal {
+  opacity: 0;
+  transition: opacity 0.7s ease;
+  transition-delay: var(--rd, 0s);
+}
+
+.about-page.is-revealing .reveal {
+  opacity: 1;
+}
+
+/* Once the initial reveal sequence has finished, remove the per-element
+   delay so user-triggered toggles (click label) don't lag. */
+.about-page.reveal-done .reveal,
+.about-page.reveal-done .fc-desc,
+.about-page.reveal-done .fc-tick {
+  transition-delay: 0s;
+}
+
+/* Horizontal line: also draws in via scaleX during reveal. */
+.reveal.fc-tl-line {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: opacity 0.6s ease, transform 1s ease;
+  transition-delay: var(--rd, 0s);
+}
+.about-page.is-revealing .reveal.fc-tl-line {
+  transform: scaleX(1);
+}
+
+/* ═══ Left side ═══ */
+.fc-card {
+  position: absolute;
+  left: calc(78 * var(--fpx));
+  top: calc(198 * var(--fpx));
+  width: calc(1328 * var(--fpx));
+  height: calc(430 * var(--fpx));
+  background: #fff;
+}
+
+.fc-portrait {
+  position: absolute;
+  left: calc(109 * var(--fpx));
+  top: calc(215 * var(--fpx));
+  width: calc(595 * var(--fpx));
+  height: calc(595 * var(--fpx));
+  border-radius: calc(35 * var(--fpx));
+  object-fit: cover;
+  display: block;
+}
+
+.fc-about-heading {
+  position: absolute;
+  left: calc(109 * var(--fpx));
+  top: calc(877 * var(--fpx));
+  width: calc(372 * var(--fpx));
+  height: calc(94 * var(--fpx));
+  margin: 0;
+  font-family: var(--font-fahkwang);
+  font-weight: 600;
+  font-size: calc(72 * var(--fpx));
+  line-height: 1;
+  color: #000;
+  white-space: nowrap;
+}
+
+.fc-quote {
+  position: absolute;
+  left: calc(109 * var(--fpx));
+  top: calc(992 * var(--fpx));
+  width: calc(570 * var(--fpx));
+  height: calc(47 * var(--fpx));
+  margin: 0;
+  font-family: var(--font-fahkwang);
+  font-weight: 400;
+  font-size: calc(36 * var(--fpx));
+  line-height: 1;
+  color: #000;
+  white-space: nowrap;
+}
+
+/* ═══ Right side — Experience ═══ */
+.fc-experience-title {
+  position: absolute;
+  left: calc(840 * var(--fpx));
+  top: calc(198 * var(--fpx));
+  width: calc(358 * var(--fpx));
+  height: calc(78 * var(--fpx));
+  margin: 0;
+  font-family: var(--font-fahkwang);
+  font-weight: 600;
+  font-size: calc(60 * var(--fpx));
+  line-height: 1;
+  color: #000;
+  white-space: nowrap;
+}
+
+.fc-tl-line {
+  position: absolute;
+  left: calc(850.75 * var(--fpx));
+  top: calc(511.25 * var(--fpx));
+  width: calc(1598.5 * var(--fpx));
+  height: 1px;
+  background: #cfcfcf;
+}
+
+.fc-dot {
+  position: absolute;
+  width: calc(35 * var(--fpx));
+  height: calc(35 * var(--fpx));
+  top: calc(495 * var(--fpx));
+  border-radius: 50%;
+  background: #F2D18B;
+  box-shadow:
+    0 0 0 calc(4 * var(--fpx)) rgba(242, 209, 139, 0.25),
+    0 0 calc(12 * var(--fpx)) rgba(242, 209, 139, 0.45);
+}
+
+.fc-dot.d1 { left: calc(1011 * var(--fpx)); }
+.fc-dot.d2 { left: calc(1425 * var(--fpx)); }
+.fc-dot.d3 { left: calc(1839 * var(--fpx)); }
+.fc-dot.d4 { left: calc(2253 * var(--fpx)); }
+
+/* Place blocks (place name + city + year) */
+.fc-place {
+  position: absolute;
+  top: calc(368 * var(--fpx));
+  transform: translateX(-50%);
+  text-align: center;
+  font-family: var(--font-fahkwang);
+  font-weight: 500;
+  font-size: calc(20 * var(--fpx));
+  line-height: 1.5;
+  color: #9b9b9b;
+  white-space: nowrap;
+  transition: color 0.25s ease;
+}
+
+.fc-place.is-active { color: #000; }
+
+.fc-place .place-name {
+  display: block;
+  font-weight: 600;
+}
+.fc-place .place-meta {
+  display: block;
+  font-weight: 400;
+}
+
+.fc-place.p1 { left: calc(1028.5 * var(--fpx)); }
+.fc-place.p2 { left: calc(1442.5 * var(--fpx)); }
+.fc-place.p3 { left: calc(1856.5 * var(--fpx)); }
+.fc-place.p4 { left: calc(2270.5 * var(--fpx)); }
+
+/* Labels — clickable */
+.fc-label {
+  position: absolute;
+  top: calc(551 * var(--fpx));
+  transform: translateX(-50%);
+  text-align: center;
+  font-family: var(--font-fahkwang);
+  font-weight: 400;
+  font-size: calc(36 * var(--fpx));
+  line-height: 1.5;
+  color: #9b9b9b;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+.fc-label.is-active { color: #000; }
+
+.fc-label:hover {
+  color: #000;
+  transform: translateX(-50%) translateY(calc(-2 * var(--fpx)));
+}
+
+.fc-label.is-active:hover { opacity: 0.7; }
+
+.fc-label:focus-visible {
+  outline: calc(2 * var(--fpx)) solid #F2D18B;
+  outline-offset: calc(4 * var(--fpx));
+  border-radius: calc(4 * var(--fpx));
+}
+
+.fc-label.l1 { left: calc(1029.5 * var(--fpx)); }
+.fc-label.l2 { left: calc(1443.5 * var(--fpx)); }
+.fc-label.l3 { left: calc(1856.5 * var(--fpx)); }
+.fc-label.l4 { left: calc(2270.5 * var(--fpx)); }
+
+/* Vertical ticks (between labels and descriptions). Hidden until the page
+   is revealing AND the column is active. */
+.fc-tick {
+  position: absolute;
+  top: calc(625 * var(--fpx));
+  width: 1px;
+  height: calc(60 * var(--fpx));
+  background: #cfcfcf;
+  transform: translateX(-50%) scaleY(0);
+  transform-origin: top center;
+  transition: transform 0.3s ease;
+  transition-delay: var(--rd, 0s);
+}
+
+.about-page.is-revealing .fc-tick.is-active {
+  transform: translateX(-50%) scaleY(1);
+}
+
+/* Descriptions — hidden until is-revealing AND is-active (so Design's
+   description joins its column's reveal sequence at the end). */
+.fc-desc {
+  position: absolute;
+  top: calc(714 * var(--fpx));
+  margin: 0;
+  font-family: var(--font-fahkwang);
+  font-weight: 400;
+  font-size: calc(16 * var(--fpx));
+  line-height: 1.5;
+  color: #000;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+  transition-delay: var(--rd, 0s);
+}
+
+.about-page.is-revealing .fc-desc.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.fc-desc.d1 { left: calc(859 * var(--fpx));  width: calc(338 * var(--fpx)); }
+.fc-desc.d2 { left: calc(1277 * var(--fpx)); width: calc(331 * var(--fpx)); }
+.fc-desc.d3 { left: calc(1695 * var(--fpx)); width: calc(324 * var(--fpx)); }
+.fc-desc.d4 { left: calc(2122 * var(--fpx)); width: calc(298 * var(--fpx)); }
+
+.fc-desc strong { font-weight: 700; }
+
+/* ═══ Splash title (mirrors ProjectsPage .projects-title) ═══ */
+.about-splash-title {
+  position: absolute;
+  top: 30%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 20;
+  transition: opacity 0.45s ease;
+}
+
+.about-splash-title h1 {
+  font-family: var(--font-fahkwang);
+  font-size: calc(4rem * var(--ui-scale));
+  font-weight: 600;
+  color: #000;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+/* ═══ Platform — viewport-bottom band ═══ */
+.about-platform {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: auto;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+  display: block;
+}
+
+/* ═══ Train (mirrors HomePage train) ═══ */
+.about-train {
+  position: absolute;
+  z-index: 4;
+}
+
+/* ═══ Robot (mirrors ProjectsPage robot-container) ═══ */
+.about-robot {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.about-robot .robot-shadow {
+  position: absolute;
+  bottom: calc(-2px * var(--ui-scale));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(70px * var(--ui-scale));
+  height: calc(10px * var(--ui-scale));
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.32) 0%,
+    rgba(0, 0, 0, 0.18) 40%,
+    rgba(0, 0, 0, 0) 75%
+  );
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(0.5px);
+}
+
+.about-robot.anim-runRight .robot-shadow {
+  bottom: calc(8px * var(--ui-scale));
+}
