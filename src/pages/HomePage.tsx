@@ -433,8 +433,30 @@ export default function HomePage() {
         return (
           <nav className={`side-nav ${sideNavExiting ? 'exiting' : ''} ${phase === 'awaiting-dest' ? 'focused' : ''}`}>
             <Link to="/about" onClick={(e) => { e.preventDefault(); queueRoute('/about'); }}>About</Link>
-            <Link to="/projects" onClick={(e) => { e.preventDefault(); queueRoute('/projects'); }}>Personal Projects</Link>
-            <Link to="/work" onClick={(e) => { e.preventDefault(); queueRoute('/work'); }}>Work Projects</Link>
+            {isMobile ? (
+              // Mobile: flat list — no dropdown, both Personal + Work top-level.
+              <>
+                <Link to="/projects" onClick={(e) => { e.preventDefault(); queueRoute('/projects'); }}>Personal Projects</Link>
+                <Link to="/work" onClick={(e) => { e.preventDefault(); queueRoute('/work'); }}>Work Projects</Link>
+              </>
+            ) : (
+              // Desktop: Projects expands to Personal/Work on hover/focus/tap.
+              <div className="side-nav-dropdown">
+                <button
+                  type="button"
+                  className="side-nav-trigger"
+                  onClick={(e) => {
+                    e.currentTarget.parentElement?.classList.toggle('open');
+                  }}
+                >
+                  Projects
+                </button>
+                <div className="side-nav-sub">
+                  <Link to="/projects" onClick={(e) => { e.preventDefault(); queueRoute('/projects'); }}>Personal</Link>
+                  <Link to="/work" onClick={(e) => { e.preventDefault(); queueRoute('/work'); }}>Work</Link>
+                </div>
+              </div>
+            )}
             <Link to="/contact" onClick={(e) => { e.preventDefault(); queueRoute('/contact'); }}>Contact</Link>
           </nav>
         );

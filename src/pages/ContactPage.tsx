@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
 import SiteHeader from '../components/SiteHeader';
+import useUiScale from '../hooks/useUiScale';
 import './ContactPage.css';
 
 type Lang = 'cn' | 'en';
@@ -32,9 +33,46 @@ const previewUrl = (url: string) => `${url}#view=Fit&toolbar=0&navpanes=0&scroll
 export default function ContactPage() {
   const [lang, setLang] = useState<Lang>('cn');
   const resume = RESUMES[lang];
+  const uiScale = useUiScale();
+
+  // global.css locks html/body/#root to overflow:hidden so the narrative
+  // pages stay pinned to the viewport. ContactPage has scrollable content
+  // (header + email/resume rows + tall PDF preview), so unlock the document
+  // scroll while this page is mounted and restore on unmount.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById('root');
+    const prev = {
+      html: { overflow: html.style.overflow, height: html.style.height },
+      body: { overflow: body.style.overflow, height: body.style.height },
+      root: root ? { overflow: root.style.overflow, height: root.style.height } : null,
+    };
+    html.style.overflow = 'auto';
+    html.style.height = 'auto';
+    body.style.overflow = 'auto';
+    body.style.height = 'auto';
+    if (root) {
+      root.style.overflow = 'auto';
+      root.style.height = 'auto';
+    }
+    return () => {
+      html.style.overflow = prev.html.overflow;
+      html.style.height = prev.html.height;
+      body.style.overflow = prev.body.overflow;
+      body.style.height = prev.body.height;
+      if (root && prev.root) {
+        root.style.overflow = prev.root.overflow;
+        root.style.height = prev.root.height;
+      }
+    };
+  }, []);
 
   return (
-    <div className="contact-page">
+    <div
+      className="contact-page"
+      style={{ ['--ui-scale' as string]: uiScale } as CSSProperties}
+    >
       <SiteHeader />
 
       <main className="contact-main">
