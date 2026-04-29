@@ -149,7 +149,7 @@ class SoundManager {
   preload(names?: SoundName[]): void {
     const toLoad = names || (Object.keys(SOUNDS) as SoundName[]);
     toLoad.forEach(name => {
-      const config = SOUNDS[name];
+      const config = SOUNDS[name] as SoundConfig;
       if (!this.cache.has(config.src)) {
         const audio = new Audio();
         audio.preload = 'auto';
@@ -166,7 +166,7 @@ class SoundManager {
     // useIsMobile.ts. Keep this in sync if that constant moves.
     if (typeof window !== 'undefined' && window.innerWidth <= 768) return null;
 
-    const config = SOUNDS[name];
+    const config = SOUNDS[name] as SoundConfig;
     const effectiveVolume =
       (options?.volume ?? config.volume ?? 1) *
       this.masterVolume *

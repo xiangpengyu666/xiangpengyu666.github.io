@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties, type ComponentType } from 'react';
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
 import SiteHeader from '../components/SiteHeader';
 import ProjectDetailModal from '../components/ProjectDetailModal';
@@ -9,7 +9,7 @@ import IceGleamDetail from '../projects/icegleam/IceGleamDetail';
 import PuppyPoopLoopDetail from '../projects/puppy-poop-loop/PuppyPoopLoopDetail';
 
 // Map each project id to its dedicated detail component.
-const DETAIL_COMPONENTS: Record<string, () => JSX.Element> = {
+const DETAIL_COMPONENTS: Record<string, ComponentType> = {
   '01': TeethDefenderDetail,
   '02': FMouseDetail,
   '03': EchoWaveDetail,

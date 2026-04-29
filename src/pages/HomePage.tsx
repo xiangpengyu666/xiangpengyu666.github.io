@@ -51,7 +51,6 @@ export default function HomePage() {
   // 50% so it lines up with the robot which also sits at 50%. trainX is
   // derived: 50 = trainX + 0.835 × trainWidth → trainX = 50 - 0.835 × width.
   const TRAIN_PARKED_X = isMobile ? 50 - 0.835 * TRAIN_WIDTH_VW : -77;
-  const DOOR_PARKED_CENTER = TRAIN_PARKED_X + 0.835 * TRAIN_WIDTH_VW;
   const [phase, setPhase] = useState<Phase>(isMobile ? 'doors-open' : 'idle-start');
   const [robotAnim, setRobotAnim] = useState<RobotAnim>('idle');
   // Mobile: robot stands dead-center of the viewport. Door is ~48% on mobile

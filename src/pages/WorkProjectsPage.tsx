@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties, type ComponentType } from 'react';
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
 import SiteHeader from '../components/SiteHeader';
 import useUiScale from '../hooks/useUiScale';
@@ -11,7 +11,7 @@ import SdReaderDetail from '../projects/sd-reader/SdReaderDetail';
 import './ProjectsPage.css';
 import './WorkProjectsPage.css';
 
-const DETAIL_COMPONENTS: Record<string, () => JSX.Element> = {
+const DETAIL_COMPONENTS: Record<string, ComponentType> = {
   '01': QuickReleaseClipDetail,
   '02': CameraClampDetail,
   '03': SdReaderDetail,
