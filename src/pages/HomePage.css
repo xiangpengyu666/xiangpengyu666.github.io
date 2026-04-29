@@ -213,7 +213,7 @@
   font-size: calc(1.25rem * var(--ui-scale));
   color: #1a1a1a;
   font-weight: 400;
-  margin-top: calc(1.5rem * var(--ui-scale) + 20px * var(--ui-scale));
+  margin-top: calc(1.5rem * var(--ui-scale) + 20px * var(--ui-scale) - 10px);
 }
 
 /* ═══ Platform ═══ */
@@ -394,15 +394,23 @@
 /* ═══ Side Nav (appears as the train arrives) ═══ */
 .side-nav {
   position: absolute;
-  /* Position uses vw — fully linear with viewport, so the buttons sit at
-     the same relative spot on any screen size (not dampened like ui-scale). */
-  top: calc(50% - 5.5vw + 65px - 20px);
-  right: calc(5rem * var(--ui-scale) + 17vw - 60px - 25px);
+  /* Position uses ui-scale-multiplied px (was raw vw — see Round-1 ultrawide
+     fix). Raw vw grows linearly with viewport, but every other piece of UI
+     (nav font, gap, etc.) is dampened via --ui-scale on big screens, so vw
+     positioning drifted: nav climbed too high vertically and pushed too far
+     inward horizontally on 2K/ultrawide. The previous values were 5.5vw and
+     17vw at 1440 baseline → 79.2px and 244.8px, scaled by ui-scale here. */
+  top: calc(50% - 79.2px * var(--ui-scale) + 65px - 20px);
+  right: calc(5rem * var(--ui-scale) + 244.8px * var(--ui-scale) - 60px - 25px);
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: calc(2.6rem * var(--ui-scale) + 20px * var(--ui-scale));
+  /* gap is min(ui-scale-derived, vh-cap) so on short-but-wide viewports
+     (e.g. 2560×1080) the nav doesn't grow taller than the viewport.
+     Baseline (1440×900, ui-scale=1): formula = 61.6px, 7vh = 63px → ui-scale
+     wins (unchanged). On widescreen-low aspects, vh cap kicks in. */
+  gap: min(calc(2.6rem * var(--ui-scale) + 20px * var(--ui-scale)), 7vh);
   padding-left: calc(1.8rem * var(--ui-scale));
   z-index: 25;
   animation: sideNavFadeIn 0.6s ease both;
@@ -481,7 +489,10 @@
   align-items: center;
   gap: calc(1.1rem * var(--ui-scale) + 20px * var(--ui-scale));
   font-family: var(--font-fahkwang);
-  font-size: calc(3.1rem * var(--ui-scale));
+  /* Same vh cap pattern as the wrapper's gap — stops items getting too tall
+     on widescreen-low aspects. 5.5vh ≈ 49.5px @ 900h matches the ui-scale=1
+     baseline of 3.1rem. */
+  font-size: min(calc(3.1rem * var(--ui-scale)), 5.5vh);
   font-weight: 400;
   color: #1a1a1a;
   text-decoration: none;
@@ -520,7 +531,8 @@
   align-items: center;
   gap: calc(1.1rem * var(--ui-scale) + 20px * var(--ui-scale));
   font-family: var(--font-fahkwang);
-  font-size: calc(3.1rem * var(--ui-scale));
+  /* Match .side-nav a font-size cap (Round-2 height bound) */
+  font-size: min(calc(3.1rem * var(--ui-scale)), 5.5vh);
   font-weight: 400;
   color: #1a1a1a;
   background: none;
@@ -584,7 +596,9 @@
 }
 
 .side-nav-sub a {
-  font-size: calc(1.9rem * var(--ui-scale));
+  /* Sub-item font follows the same vh cap pattern, scaled down to 1.9rem
+     baseline. 3.4vh ≈ 30.6px @ 900h matches ui-scale=1. */
+  font-size: min(calc(1.9rem * var(--ui-scale)), 3.4vh);
   font-weight: 400;
   color: #1a1a1a;
   opacity: 0.85;

@@ -213,10 +213,14 @@
 
 .project-card {
   position: absolute;
-  top: 0;
-  /* 27vw already scales linearly with viewport — no extra ui-scale multiplier,
-     or it would double-scale. The previous max-width: 540px cap is dropped. */
-  width: 27vw;
+  top: 15px;
+  /* 27vw was the original "scene-vw" sizing — linear with viewport width.
+     Round-2 cross-screen fix: also cap by vh so on widescreen aspects the
+     thumb (aspect 527/386) doesn't push card title/desc downward into the
+     robot's hint bubble below. 48vh chosen so 1440×900 / 1920×1080 are
+     unchanged (27vw is still the smaller term there); only when the viewport
+     gets wider per unit height does the cap kick in. */
+  width: min(27vw, 48vh);
   transform: translateX(-50%) scale(1.2);
   transform-origin: top center;
   font-family: var(--font-puhui);

@@ -3,7 +3,18 @@
 .about-page {
   --ui-scale: 1;
   --train-scale: 1.25;
-  --fpx: calc(100vw / 2559);
+  /* Round-2 cross-screen fix:
+     Originally --fpx = 100vw / 2559 — width-only scaling. On widescreens
+     (e.g. 21:9, or any aspect wider than the Figma 2559:1347 ≈ 1.9:1) the
+     canvas height (1347 × fpx) grew past the viewport, pushing every Figma-
+     positioned element (which uses --fpx for y) downward into the platform's
+     breathing room. Now bounded by BOTH dimensions: width-derived for the
+     baseline, height-derived (95vh / 1347) so the canvas never exceeds 95%
+     of viewport height. The 5% headroom guarantees the platform image at
+     viewport-bottom stays clear of content. On standard 16:9/16:10 laptops
+     (1440×900, 1920×1080, 2880×1800) the width term still wins → behavior
+     unchanged. */
+  --fpx: min(calc(100vw / 2559), calc(95vh / 1347));
   width: 100vw;
   height: 100vh;
   position: relative;
@@ -16,10 +27,18 @@
 /* ═══ Figma canvas ═══ */
 .figma-canvas {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: calc(100vw * 1347 / 2559);
+  /* Canvas dimensions both derived from --fpx so the aspect locks at 2559:1347.
+     On wide aspects --fpx is height-bounded → canvas becomes narrower than
+     viewport and is centered horizontally (letterboxed). The platform image
+     is a SIBLING (.about-platform) anchored to viewport bottom at width:100%,
+     so it spans the full viewport even when the canvas letterboxes — the side
+     letterbox is invisible because everything outside the canvas is white,
+     same as the canvas background. */
+  width: calc(2559 * var(--fpx));
+  height: calc(1347 * var(--fpx));
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 5;
   pointer-events: none;  /* re-enabled per-button below */
 }

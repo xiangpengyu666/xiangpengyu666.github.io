@@ -56,7 +56,7 @@ idle-start → greeting → free-roam → train-arriving → train-stopped → d
 When `phase === 'train-arriving'` flips on, a vertical nav slides in on the right side of HomePage and **persists until the user clicks an item** (or the page navigates away). Renders About / Projects / Blog / Contact, with Projects expanding into a Personal/Work submenu on hover/focus/click. Implemented inline in `HomePage.tsx` (it's homepage-specific, not shared).
 
 - **Bullets**: filled circles, color `#F2D18B` (warm yellow), with a subtle two-stop glow. The whole nav has a thin vertical line on the left at `opacity 0.4` (`width: 1.5px`); the submenu has its own shorter sub-line indented further right.
-- **Position is vw-based** (`top: calc(50% - 5.5vw + 65px)`, `right: calc(5rem * var(--ui-scale) + 17vw - 60px)`) so the buttons track the viewport linearly — `--ui-scale` is dampened on big screens, vw is not, and we want the side-nav to follow the layout 1:1.
+- **Position is ui-scale-based** (`top: calc(50% - 79.2px * var(--ui-scale) + 65px - 20px)`, `right: calc(5rem * var(--ui-scale) + 244.8px * var(--ui-scale) - 60px - 25px)`). Originally written in raw vw (`5.5vw` and `17vw`) so buttons would track viewport linearly, but on 2K/ultrawide that drifted the nav upward and pushed it inward past the welcome text. Round-1 fix converts those vw constants to their 1440-baseline px equivalents (5.5vw × 14.4 = 79.2px, 17vw × 14.4 = 244.8px) multiplied by the dampened `--ui-scale`, so they now grow with the rest of the UI (which is also ui-scale-dampened) instead of the raw viewport.
 - **Click flow** (top-level + submenu items both):
   1. `setPendingRoute(path)` + `setSideNavExiting(true)`.
   2. CSS `.exiting` class swaps the entrance `animation: sideNavFadeIn` for `animation: sideNavFadeOut 2s forwards` — explicitly *replacing* the entrance animation, because a plain class change can't override the entrance keyframes' pinned opacity (this bit me the first time). The exit animation also `translateX(60px)` so the nav slides right while fading.
@@ -194,7 +194,7 @@ Flow:
 10. **Project entry — three ways**:
     - **Space**: when robot is within **16vw** of any project's `xVw` (Personal) or 12vw of `xVw + WORK_IMG_OFFSET_VW` (Work) — i.e. anywhere visually under the card image — plays jump animation → opens project detail modal. Threshold is the card image half-width: 27vw × scale 1.2 ÷ 2 ≈ 16vw on Personal; 76% × 27vw × 1.2 ÷ 2 ≈ 12vw on Work.
     - **Click card**: walks the robot to that project's `xVw` (or jumps immediately if already near), then jumps and opens detail. Cards have `role="button"`, `tabIndex` (when in free-roam), and `Enter` keyboard support.
-    - **Side-arrow buttons** (`.nav-arrow-left/right`, viewport-fixed): step to the prior/next nearest project at `speedMul: 2` (faster than auto/manual walk; was 1.5). Card click also uses `speedMul: 2` so click-to-walk feels equally snappy. Buttons disable at scene edges.
+    - **Side-arrow buttons** (`.nav-arrow-left/right`, viewport-fixed): step to the prior/next nearest project at `speedMul: 2 / 1.5` ≈ 1.33 (slowed from 2, originally 1.5). Card click still uses `speedMul: 2` for snappy click-to-walk. Buttons disable at scene edges.
     Esc or click-outside the modal closes it.
 
 Key coordinates:
@@ -205,7 +205,7 @@ Key coordinates:
 - Robot baseline is `bottom: calc(${100 - PLATFORM_Y}% - 3px + ${45 * uiScale}px)` (3px below platform line + 45px lift to match the painted yellow strip in `platform.webp`) — Projects-page-only fine-tune, doesn't apply to train/cards. The +45px lift is mirrored by train and to-be-continued sign.
 
 Card layout (matches Figma Desk-3/4):
-- Each `.project-card` width 27vw (no max-width cap — removed during responsive-scaling fix), `transform: translateX(-50%) scale(1.2)` with `transform-origin: top center`
+- Each `.project-card` width `min(27vw, 48vh)` (Round-2 cross-screen fix — vh cap stops the thumb from pushing title/desc down into the robot's hint bubble on widescreen aspects; 1440×900 / 1920×1080 are unchanged because 27vw is still the smaller term), `transform: translateX(-50%) scale(1.2)` with `transform-origin: top center`
 - `.projects-row` top: `calc(25% - 120px * var(--ui-scale))`
 - Number 48px PuHuiTi Regular `#808080`; title 24px PuHuiTi SemiBold black; subtitle 24px PuHuiTi Regular `#808080`
 - Thumbnail aspect-ratio `527 / 386`, `object-fit: cover`
@@ -232,7 +232,11 @@ Third destination in the train-journey narrative. Source: Figma `162:64` (canvas
 
 **Layout system — Figma-coord absolute positioning**
 
-Every visible content element is positioned in raw Figma coordinates from the 2559×1347 baseline frame. A single CSS variable `--fpx: calc(100vw / 2559)` converts 1 Figma px → vw, so all `left/top/width/height/font-size` are written as `calc(N * var(--fpx))`. The `.figma-canvas` wrapper is `100vw × calc(100vw * 1347/2559)` — preserves Figma aspect, scales linearly with viewport width.
+Every visible content element is positioned in raw Figma coordinates from the 2559×1347 baseline frame. A single CSS variable `--fpx` converts 1 Figma px → current pixels, and all `left/top/width/height/font-size` are written as `calc(N * var(--fpx))`.
+
+`--fpx: min(calc(100vw / 2559), calc(95vh / 1347))` — bounded by **both** viewport dimensions (Round-2 cross-screen fix). The width term is the original baseline; the height term caps the canvas at 95% of viewport height so wide aspect ratios (e.g. 21:9 ultrawide) can't push content downward into the platform image's breathing room. On standard 16:9/16:10 laptops the width term wins, so behavior is unchanged from the original implementation.
+
+`.figma-canvas` is sized **from `--fpx` in both axes** (`width: calc(2559 * --fpx); height: calc(1347 * --fpx)`) and centered horizontally (`left: 50%; transform: translateX(-50%)`). On wide aspects the canvas letterboxes — the `.about-platform` sibling stays full viewport width because it's anchored at `left:0; right:0; bottom:0` outside the canvas, and the side letterbox is invisible (white over white).
 
 Specific coords baked into `AboutPage.css`:
 - White card (Rectangle 1): 78, 198, 1328×430

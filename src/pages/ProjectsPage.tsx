@@ -410,7 +410,7 @@ export default function ProjectsPage() {
       if (dir === 'right' && PROJECTS[idx].xVw < robotXRef.current && idx < PROJECTS.length - 1) nextIdx = idx + 1;
     }
     if (nextIdx < 0 || nextIdx >= PROJECTS.length) return;
-    walkToProject(PROJECTS[nextIdx], false, 2);
+    walkToProject(PROJECTS[nextIdx], false, 2 / 1.5);
   }, [getNearestProjectIndex, walkToProject]);
 
   const onCardClick = useCallback((proj: typeof PROJECTS[number]) => {
