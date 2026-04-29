@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, type CSSProperties, type Reac
 import SiteHeader from '../components/SiteHeader';
 import SpriteAnimator, { SPRITES, type SpriteConfig } from '../components/SpriteAnimator';
 import useUiScale from '../hooks/useUiScale';
+import { useSound } from '../hooks/useSound';
 import './AboutPage.css';
 
 const PORTRAIT = `${import.meta.env.BASE_URL}about/portrait.webp`;
@@ -107,6 +108,7 @@ const revealDelayMs = (figmaX: number, max = 2400) =>
 
 export default function AboutPage() {
   const uiScale = useUiScale();
+  const { play } = useSound();
 
   const [phase, setPhase] = useState<Phase>('train-entering');
   const [robotAnim, setRobotAnim] = useState<RobotAnim>('idle');
@@ -269,6 +271,7 @@ export default function AboutPage() {
     if (phase !== 'frozen') return;
     setDoorsOpen(false);
     const departTimer = setTimeout(() => {
+      play('trainDepart');
       const SPEED = 70; // %/s
       let lastT = 0;
       let currentX = -77;
@@ -289,6 +292,16 @@ export default function AboutPage() {
     }, 700); // wait for doors to close
     return () => clearTimeout(departTimer);
   }, [phase]);
+
+  // ═══ Footstep loop — same pattern as HomePage / ProjectsPage. Auto-plays
+  //     while runRight is active (disembark mini-walk + auto-walk to center). */
+  useEffect(() => {
+    if (robotAnim !== 'runRight') return;
+    play('footstep');
+    const id = window.setInterval(() => play('footstep'), 420);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [robotAnim]);
 
   // ═══ Sprite picker ═══
   const getCurrentSprite = (): { sprite: SpriteConfig; flip: boolean } => {

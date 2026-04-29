@@ -18,6 +18,7 @@ const DETAIL_COMPONENTS: Record<string, () => JSX.Element> = {
 };
 import useUiScale from '../hooks/useUiScale';
 import useIsMobile from '../hooks/useIsMobile';
+import { useSound } from '../hooks/useSound';
 import './ProjectsPage.css';
 
 type Phase =
@@ -60,6 +61,7 @@ const TO_BE_CONTINUED_X_VW = 265;
 export default function ProjectsPage() {
   const uiScale = useUiScale();
   const isMobile = useIsMobile();
+  const { play } = useSound();
   // On mobile we skip the entire boarding/disembark/title sequence — start at
   // free-roam with cards already visible. The phase-gated useEffects below
   // naturally no-op because they all early-return when phase !== their target.
@@ -182,6 +184,7 @@ export default function ProjectsPage() {
   // ═══ Phase 5: Train slides off-screen right ═══
   useEffect(() => {
     if (phase !== 'train-leaving') return;
+    play('trainDepart');
     const targetX = 100;
     const SPEED = 70; // %/s
     let currentX = trainX;
@@ -244,6 +247,7 @@ export default function ProjectsPage() {
         // width = 27vw × scale 1.2 = 32.4vw, so half-width ≈ 16vw from center.
         const near = PROJECTS.find(p => Math.abs(p.xVw - robotX) < 16);
         if (near) {
+          play('jump');
           setActiveProject(near);
           setRobotAnim('jump');
           setPhase('jumping');
@@ -283,6 +287,7 @@ export default function ProjectsPage() {
           robotXRef.current = aw.target;
           autoWalkRef.current = null;
           if (aw.jumpProject) {
+            play('jump');
             setActiveProject(aw.jumpProject);
             setRobotAnim('jump');
             setPhase('jumping');
@@ -383,12 +388,23 @@ export default function ProjectsPage() {
     return bestIdx;
   }, []);
 
+  // Footstep loop — fire a short blip every ~280ms while the robot is running
+  // (manual or auto-walk). Auto-pauses when robotAnim leaves runLeft/runRight.
+  useEffect(() => {
+    if (robotAnim !== 'runLeft' && robotAnim !== 'runRight') return;
+    play('footstep');
+    const id = window.setInterval(() => play('footstep'), 420);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [robotAnim]);
+
   // Walk to a project's xVw; if jumpAfter, trigger jump + open modal on arrival.
   const walkToProject = useCallback((proj: typeof PROJECTS[number], jumpAfter: boolean, speedMul?: number) => {
     if (phaseRef.current !== 'free-roam') return;
     const NEAR = 1.5; // vw — already "there"
     if (Math.abs(proj.xVw - robotXRef.current) < NEAR) {
       if (jumpAfter) {
+        play('jump');
         autoWalkRef.current = null;
         setActiveProject(proj);
         setRobotAnim('jump');
@@ -425,7 +441,7 @@ export default function ProjectsPage() {
       setPhase('project-detail');
       return;
     }
-    walkToProject(proj, true, 2);
+    walkToProject(proj, true, 2 / 1.5);
   }, [walkToProject, isMobile]);
 
   const getCurrentSprite = () => {

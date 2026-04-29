@@ -1,0 +1,101 @@
+/* ---- SoundToggle 浮动按钮 ---- */
+
+.sound-toggle-wrapper {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sound-tooltip {
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  animation: tooltipFadeIn 0.4s ease, tooltipFadeOut 0.4s ease 3.5s forwards;
+  pointer-events: none;
+}
+
+.sound-toggle {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.sound-toggle:hover {
+  background: rgba(0, 0, 0, 0.7);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.1);
+}
+
+.sound-toggle:active {
+  transform: scale(0.95);
+}
+
+.sound-toggle.playing {
+  border-color: rgba(218, 165, 32, 0.5); /* golden accent */
+}
+
+.sound-toggle.playing:hover {
+  border-color: rgba(218, 165, 32, 0.8);
+}
+
+/* 声波动画 */
+.sound-wave {
+  opacity: 0.8;
+}
+
+.sound-wave.wave-1 {
+  animation: soundPulse 1.2s ease-in-out infinite;
+}
+
+.sound-wave.wave-2 {
+  animation: soundPulse 1.2s ease-in-out 0.3s infinite;
+}
+
+@keyframes soundPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes tooltipFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .sound-toggle-wrapper {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .sound-toggle {
+    width: 60px;
+    height: 60px;
+  }
+
+  .sound-tooltip {
+    display: none;
+  }
+}

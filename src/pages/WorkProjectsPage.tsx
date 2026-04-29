@@ -3,6 +3,7 @@ import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
 import SiteHeader from '../components/SiteHeader';
 import useUiScale from '../hooks/useUiScale';
 import useIsMobile from '../hooks/useIsMobile';
+import { useSound } from '../hooks/useSound';
 import ProjectDetailModal from '../components/ProjectDetailModal';
 import QuickReleaseClipDetail from '../projects/quick-release-clip/QuickReleaseClipDetail';
 import CameraClampDetail from '../projects/camera-clamp/CameraClampDetail';
@@ -63,6 +64,7 @@ const PROJECTS = [
 export default function WorkProjectsPage() {
   const uiScale = useUiScale();
   const isMobile = useIsMobile();
+  const { play } = useSound();
   // Mobile: skip the train/disembark/title sequence — render cards as a plain
   // vertical list. See ProjectsPage.tsx for the same pattern.
   const [phase, setPhase] = useState<Phase>(isMobile ? 'free-roam' : 'train-entering');
@@ -182,6 +184,7 @@ export default function WorkProjectsPage() {
   // ═══ Phase 5: Train slides off-screen right ═══
   useEffect(() => {
     if (phase !== 'train-leaving') return;
+    play('trainDepart');
     const targetX = 100;
     const SPEED = 70; // %/s
     let currentX = trainX;
@@ -241,6 +244,7 @@ export default function WorkProjectsPage() {
         // half-width ≈ 12vw from the image's visible center.
         const near = PROJECTS.find(p => Math.abs((p.xVw + WORK_IMG_OFFSET_VW) - robotX) < 12);
         if (near) {
+          play('jump');
           setActiveProject(near);
           setRobotAnim('jump');
           setPhase('jumping');
@@ -280,6 +284,7 @@ export default function WorkProjectsPage() {
           robotXRef.current = aw.target;
           autoWalkRef.current = null;
           if (aw.jumpProject) {
+            play('jump');
             setActiveProject(aw.jumpProject);
             setRobotAnim('jump');
             setPhase('jumping');
@@ -381,12 +386,22 @@ export default function WorkProjectsPage() {
     return bestIdx;
   }, []);
 
+  // Footstep loop — same pattern as ProjectsPage / HomePage.
+  useEffect(() => {
+    if (robotAnim !== 'runLeft' && robotAnim !== 'runRight') return;
+    play('footstep');
+    const id = window.setInterval(() => play('footstep'), 420);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [robotAnim]);
+
   const walkToProject = useCallback((proj: typeof PROJECTS[number], jumpAfter: boolean, speedMul?: number) => {
     if (phaseRef.current !== 'free-roam') return;
     const NEAR = 1.5;
     const target = projectTargetVw(proj);
     if (Math.abs(target - robotXRef.current) < NEAR) {
       if (jumpAfter) {
+        play('jump');
         autoWalkRef.current = null;
         setActiveProject(proj);
         setRobotAnim('jump');
@@ -418,7 +433,7 @@ export default function WorkProjectsPage() {
       setPhase('project-detail');
       return;
     }
-    walkToProject(proj, true, 2);
+    walkToProject(proj, true, 2 / 1.5);
   }, [walkToProject, isMobile]);
 
   const getCurrentSprite = () => {

@@ -4,6 +4,8 @@ import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
 import SiteHeader from '../components/SiteHeader';
 import useUiScale from '../hooks/useUiScale';
 import useIsMobile from '../hooks/useIsMobile';
+import { useSound } from '../hooks/useSound';
+import useSoundConsent from '../hooks/useSoundConsent';
 import './HomePage.css';
 
 type Phase =
@@ -34,6 +36,8 @@ const TRAIN_SCALE_MOBILE = 2.5;
 export default function HomePage() {
   const uiScale = useUiScale();
   const isMobile = useIsMobile();
+  const { play } = useSound();
+  const { ready } = useSoundConsent();
   // Resolve the train geometry from the current viewport bucket. JS values
   // mirror the CSS --train-scale custom property below (set inline on the
   // root) so door-position math stays in sync with the visual.
@@ -65,15 +69,20 @@ export default function HomePage() {
   const keysRef = useRef<Set<string>>(new Set());
   const frameLoopRef = useRef<number>(0);
   const trainAnimRef = useRef<number>(0);
-  // Phase 1: Start with idle, then trigger greeting after 1s — desktop only
+  // Phase 1: Start with idle, then trigger greeting after 1s — desktop only.
+  // Gated on `ready` (from SoundConsentContext) so the entire phase machine
+  // stays paused at idle-start until the user dismisses the consent modal.
+  // Their button click satisfies the browser's autoplay user-gesture rule,
+  // so play('greeting') 300ms after `ready` flips works without further wait.
   useEffect(() => {
-    if (isMobile) return;
+    if (isMobile || !ready) return;
     const timer = setTimeout(() => {
       setPhase('greeting');
       setRobotAnim('greeting');
+      play('greeting');
     }, 300);
     return () => clearTimeout(timer);
-  }, [isMobile]);
+  }, [isMobile, ready]);
 
   // Greeting complete → free-roam briefly, then train starts arriving.
   const onGreetingComplete = useCallback(() => {
@@ -81,6 +90,17 @@ export default function HomePage() {
     setPhase('free-roam');
     setTimeout(() => setPhase('train-arriving'), 200);
   }, []);
+
+  // Footstep loop — fire a short blip every ~280ms while the robot is running
+  // so the walk reads as movement instead of silence. setInterval keyed on
+  // robotAnim so it auto-pauses when the robot stops / boards / etc.
+  useEffect(() => {
+    if (robotAnim !== 'runLeft' && robotAnim !== 'runRight') return;
+    play('footstep');
+    const id = window.setInterval(() => play('footstep'), 420);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [robotAnim]);
 
   // Train arrival — only after greeting finishes. Speed factor 0.02 (half of
   // the original 0.04) for a more leisurely pull-in.
@@ -119,9 +139,10 @@ export default function HomePage() {
     }
   }, [phase, pendingRoute]);
 
-  // Departing: train slides off-screen right at constant speed, then navigates
+  // Departing: train slides off-screen right at constant speed, then navigates.
   useEffect(() => {
     if (phase !== 'departing') return;
+    play('trainDepart');
     const targetX = 100; // off-screen right
     // Mobile train is 2× wider (TRAIN_SCALE_MOBILE) so it has 2× more vw to
     // travel before clearing the viewport — double the speed to keep depart
@@ -156,6 +177,7 @@ export default function HomePage() {
       // Space to board — auto-walks to the door center, then plays board animation
       if (e.key === ' ' && phase === 'doors-open') {
         e.preventDefault();
+        play('boardTrain');
         setShowHint(false);
         setPhase('boarding');
       }
@@ -224,6 +246,9 @@ export default function HomePage() {
   // like walking instead of teleporting.
   useEffect(() => {
     if (phase !== 'boarding') return;
+    // play('boardTrain') is fired in the click handlers themselves (queueRoute /
+    // onDestinationSelect / Space key) so the audio is in lock-step with the
+    // user's tap. Doing it here adds 1–2 render cycles of latency.
     const targetX = getDoorCenterPercent();
     let currentX = robotX;
 
@@ -318,6 +343,7 @@ export default function HomePage() {
           // Only intercept if the train is docked with doors open — otherwise
           // there's no sensible boarding animation to run, let Link navigate.
           if (phase !== 'doors-open') return false;
+          play('boardTrain');
           setPendingRoute(path);
           setShowHint(false);
           setPhase('boarding');
@@ -325,12 +351,16 @@ export default function HomePage() {
         }}
       />
 
-      {/* Welcome text */}
-      <section className="welcome">
-        <h1><span className="welcome-hi">Hi!</span> I'm Xiangpeng,</h1>
-        <h1>An interdisciplinary designer and engineer.</h1>
-        <p>Industrial Design, Game Design, IoT, Robotics</p>
-      </section>
+      {/* Welcome text — only mounted after consent, so the staggered CSS
+          fade-in animation runs once the user actually starts the experience
+          (instead of running silently behind the modal). */}
+      {ready && (
+        <section className="welcome">
+          <h1><span className="welcome-hi">Hi!</span> I'm Xiangpeng,</h1>
+          <h1>An interdisciplinary designer and engineer.</h1>
+          <p>Industrial Design, Game Design, IoT, Robotics</p>
+        </section>
+      )}
 
       {/* Background - Station */}
       <div className="station-bg">
@@ -421,6 +451,12 @@ export default function HomePage() {
       {sideNavShown && (() => {
         const queueRoute = (path: string) => {
           if (sideNavExiting) return;
+          // Fire boarding sound immediately on click (no React render delay).
+          // Skip if we're already past doors-open — the depart sound will
+          // take over from the existing departing useEffect.
+          if (phase === 'doors-open') {
+            play('boardTrain');
+          }
           setPendingRoute(path);
           setSideNavExiting(true);
           // If the robot has already boarded and we're waiting for a
