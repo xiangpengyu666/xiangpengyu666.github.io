@@ -162,6 +162,9 @@ class SoundManager {
   // ---- 播放 ----
   play(name: SoundName, options?: { volume?: number }): string | null {
     if (this.muted) return null;
+    // Mobile (≤768px) skips audio entirely — mirrors MOBILE_BREAKPOINT in
+    // useIsMobile.ts. Keep this in sync if that constant moves.
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) return null;
 
     const config = SOUNDS[name];
     const effectiveVolume =

@@ -14,7 +14,8 @@
   background: #fafafa;
 }
 
-.pd-slide-img img {
+.pd-slide-img img,
+.pd-slide-img video {
   display: block;
   width: 100%;
   height: auto;  /* Natural aspect of the PNG drives figure height — no cropping */

@@ -5,21 +5,18 @@ import './ContactPage.css';
 
 type Lang = 'cn' | 'en';
 
-// Both resume languages live in /public. The English file is a placeholder —
-// it currently points at the same PDF as Chinese until the English version
-// is provided. Replace public/Xiangpeng-Yu-Resume-EN.pdf when ready (no other
-// code change needed).
+// Both resume languages live in /public. EN listed first so it's the default
+// preview / leftmost tab.
 const RESUMES: Record<Lang, { url: string; downloadName: string; label: string }> = {
-  cn: {
-    url: `${import.meta.env.BASE_URL}Xiangpeng-Yu-Resume.pdf`,
-    downloadName: 'Xiangpeng_Yu_CV_CN.pdf',
-    label: '中文',
-  },
   en: {
-    // Placeholder — same file as CN until the EN version is uploaded
-    url: `${import.meta.env.BASE_URL}Xiangpeng-Yu-Resume.pdf`,
+    url: `${import.meta.env.BASE_URL}Xiangpeng-Yu-Resume-EN.pdf`,
     downloadName: 'Xiangpeng_Yu_CV_EN.pdf',
     label: 'English',
+  },
+  cn: {
+    url: `${import.meta.env.BASE_URL}Xiangpeng-Yu-Resume-CN.pdf`,
+    downloadName: 'Xiangpeng_Yu_CV_CN.pdf',
+    label: '中文',
   },
 };
 
@@ -31,7 +28,7 @@ const EMAIL = 'xiangpengyu020104@gmail.com';
 const previewUrl = (url: string) => `${url}#view=Fit&toolbar=0&navpanes=0&scrollbar=0`;
 
 export default function ContactPage() {
-  const [lang, setLang] = useState<Lang>('cn');
+  const [lang, setLang] = useState<Lang>('en');
   const resume = RESUMES[lang];
   const uiScale = useUiScale();
 

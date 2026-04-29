@@ -4,6 +4,11 @@ import './ProjectDetail.css';
 export interface Slide {
   file: string;
   alt: string;
+  /** "video" renders an autoplay-muted-loop <video> instead of <img>.
+   *  Defaults to image. */
+  kind?: 'image' | 'video';
+  /** Optional poster (still frame) for video slides. */
+  poster?: string;
 }
 
 interface Props {
@@ -62,15 +67,31 @@ export default function ProjectSlideStack({ slug, basePath = 'projects', slides 
 
   return (
     <div className="pd-root" ref={rootRef}>
-      {slides.map((s, i) => (
-        <figure key={s.file} className="pd-slide-img pd-anim">
-          <img
-            src={`${BASE}${basePath}/${slug}/slides/${s.file}`}
-            alt={s.alt}
-            loading={i === 0 ? 'eager' : 'lazy'}
-          />
-        </figure>
-      ))}
+      {slides.map((s, i) => {
+        const src = `${BASE}${basePath}/${slug}/slides/${s.file}`;
+        return (
+          <figure key={s.file} className="pd-slide-img pd-anim">
+            {s.kind === 'video' ? (
+              <video
+                src={src}
+                poster={s.poster ? `${BASE}${basePath}/${slug}/slides/${s.poster}` : undefined}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                aria-label={s.alt}
+              />
+            ) : (
+              <img
+                src={src}
+                alt={s.alt}
+                loading={i === 0 ? 'eager' : 'lazy'}
+              />
+            )}
+          </figure>
+        );
+      })}
     </div>
   );
 }
