@@ -1,0 +1,112 @@
+.contact-page {
+  width: 100vw;
+  min-height: 100vh;
+  background: #fff;
+  color: #1a1a1a;
+}
+
+.contact-main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 7rem 2rem 4rem;
+}
+
+.contact-main h1 {
+  font-family: var(--font-fahkwang);
+  font-size: clamp(2.4rem, 4.4vw, 3.6rem);
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.contact-lede {
+  font-family: var(--font-fahkwang);
+  font-size: 1.1rem;
+  color: #555;
+  margin: 0 0 2.4rem;
+}
+
+.contact-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.contact-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  font-family: var(--font-puhui);
+  font-size: 1.05rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 0.6rem 0;
+}
+
+.contact-label {
+  flex-shrink: 0;
+  width: 5.5rem;
+  font-family: var(--font-fahkwang);
+  font-size: 0.9rem;
+  color: #808080;
+  letter-spacing: 0.04em;
+}
+
+.contact-list a {
+  color: #1a1a1a;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.4);
+  transition: opacity 0.15s ease;
+}
+.contact-list a:hover {
+  opacity: 0.6;
+}
+
+.contact-lang-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.lang-tab {
+  font-family: var(--font-fahkwang);
+  font-size: 0.9rem;
+  /* Use flex-centered text + line-height: 1 so the labels sit in the
+     vertical middle of the pill regardless of Fahkwang's asymmetric metrics. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0.55rem 1.1rem;
+  background: transparent;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.lang-tab:hover { color: #1a1a1a; }
+.lang-tab.is-active {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.contact-pdf {
+  width: 100%;
+  /* Size to A4 page aspect (1:√2) so the PDF viewer's empty letterbox area
+     below the page doesn't render as a big black block. */
+  aspect-ratio: 1 / 1.414;
+  height: auto;
+  display: block;
+  /* No outer border — the browser's native PDF viewer paints its own page
+     frame inside, so adding our own creates a doubled-up "black box" look. */
+  border: none;
+  border-radius: 8px;
+  background: #fff;
+}

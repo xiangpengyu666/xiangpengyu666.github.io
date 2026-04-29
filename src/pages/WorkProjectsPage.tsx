@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, type CSSProperties } from 're
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
 import SiteHeader from '../components/SiteHeader';
 import useUiScale from '../hooks/useUiScale';
+import useIsMobile from '../hooks/useIsMobile';
 import ProjectDetailModal from '../components/ProjectDetailModal';
 import QuickReleaseClipDetail from '../projects/quick-release-clip/QuickReleaseClipDetail';
 import CameraClampDetail from '../projects/camera-clamp/CameraClampDetail';
@@ -61,14 +62,17 @@ const PROJECTS = [
 
 export default function WorkProjectsPage() {
   const uiScale = useUiScale();
-  const [phase, setPhase] = useState<Phase>('train-entering');
+  const isMobile = useIsMobile();
+  // Mobile: skip the train/disembark/title sequence — render cards as a plain
+  // vertical list. See ProjectsPage.tsx for the same pattern.
+  const [phase, setPhase] = useState<Phase>(isMobile ? 'free-roam' : 'train-entering');
   const [robotAnim, setRobotAnim] = useState<RobotAnim>('idle');
   const [robotX, setRobotX] = useState(0);     // vw in scene coordinates
   const [trainX, setTrainX] = useState(-TRAIN_WIDTH_VW);  // % from left (fully off-screen left)
   const [doorsOpen, setDoorsOpen] = useState(false);
   const [robotVisible, setRobotVisible] = useState(false); // hidden until exits train
   const [titleOpacity, setTitleOpacity] = useState(0);
-  const [cardsVisible, setCardsVisible] = useState(false);
+  const [cardsVisible, setCardsVisible] = useState(isMobile);
   const [cameraX, setCameraX] = useState(0);   // vw offset applied to scene
   const [activeProject, setActiveProject] = useState<typeof PROJECTS[number] | null>(null);
   const [robotDxPx, setRobotDxPx] = useState(0);  // fine x offset in px (for disembark slide)
@@ -409,8 +413,13 @@ export default function WorkProjectsPage() {
   }, [getNearestProjectIndex, walkToProject]);
 
   const onCardClick = useCallback((proj: typeof PROJECTS[number]) => {
+    if (isMobile) {
+      setActiveProject(proj);
+      setPhase('project-detail');
+      return;
+    }
     walkToProject(proj, true, 2);
-  }, [walkToProject]);
+  }, [walkToProject, isMobile]);
 
   const getCurrentSprite = () => {
     switch (robotAnim) {

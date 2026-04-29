@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import SpriteAnimator, { SPRITES } from '../components/SpriteAnimator';
 import SiteHeader from '../components/SiteHeader';
 import useUiScale from '../hooks/useUiScale';
+import useIsMobile from '../hooks/useIsMobile';
 import './HomePage.css';
 
 type Phase =
@@ -24,33 +25,55 @@ const PLATFORM_Y = 95; // % from top where platform floor is — tuned so the
                        // robot's feet land on the yellow tactile strip in
                        // platform.webp (yellow line is ~26% from image bottom).
 const MOVE_SPEED = 0.5;
-// Keep in sync with --train-scale in HomePage.css
-const TRAIN_SCALE = 1.25;
-const TRAIN_WIDTH_VW = 95 * TRAIN_SCALE;
+// Keep in sync with --train-scale in HomePage.css.
+// Mobile uses a 2× scale so the train reads as the hero visual instead of
+// shrinking to thumbnail size on portrait screens.
+const TRAIN_SCALE_DESKTOP = 1.25;
+const TRAIN_SCALE_MOBILE = 2.5;
 
 export default function HomePage() {
   const uiScale = useUiScale();
-  const [phase, setPhase] = useState<Phase>('idle-start');
+  const isMobile = useIsMobile();
+  // Resolve the train geometry from the current viewport bucket. JS values
+  // mirror the CSS --train-scale custom property below (set inline on the
+  // root) so door-position math stays in sync with the visual.
+  const trainScale = isMobile ? TRAIN_SCALE_MOBILE : TRAIN_SCALE_DESKTOP;
+  const TRAIN_WIDTH_VW = 95 * trainScale;
+  // Mobile (option C): skip the entire entrance sequence — train pre-parked,
+  // doors already open, robot at door, ready for the user to tap a drawer
+  // destination. The existing onDestinationSelect interceptor + boarding/
+  // departing pipeline run unchanged from there.
+  // On mobile the door (at +83.5% of the train width) is anchored to viewport
+  // 50% so it lines up with the robot which also sits at 50%. trainX is
+  // derived: 50 = trainX + 0.835 × trainWidth → trainX = 50 - 0.835 × width.
+  const TRAIN_PARKED_X = isMobile ? 50 - 0.835 * TRAIN_WIDTH_VW : -77;
+  const DOOR_PARKED_CENTER = TRAIN_PARKED_X + 0.835 * TRAIN_WIDTH_VW;
+  const [phase, setPhase] = useState<Phase>(isMobile ? 'doors-open' : 'idle-start');
   const [robotAnim, setRobotAnim] = useState<RobotAnim>('idle');
-  const [robotX, setRobotX] = useState(50); // % from left
-  const [trainX, setTrainX] = useState(-TRAIN_WIDTH_VW); // % from left (fully off-screen left)
-  const [doorsOpen, setDoorsOpen] = useState(false);
+  // Mobile: robot stands dead-center of the viewport. Door is ~48% on mobile
+  // (close enough that the boarding walk is a couple of steps, not a teleport).
+  const [robotX, setRobotX] = useState(isMobile ? 50 : 50);
+  const [trainX, setTrainX] = useState(isMobile ? TRAIN_PARKED_X : -TRAIN_WIDTH_VW);
+  const [doorsOpen, setDoorsOpen] = useState(isMobile);
   const [showHint, setShowHint] = useState(false);
   const [pendingRoute, setPendingRoute] = useState<string | null>(null);
-  const [sideNavShown, setSideNavShown] = useState(false);
+  // Mobile shows the side-nav from the start (positioned below welcome via
+  // mobile.css), since there's no train-arriving phase to gate it.
+  const [sideNavShown, setSideNavShown] = useState(isMobile);
   const [sideNavExiting, setSideNavExiting] = useState(false);
   const navigate = useNavigate();
   const keysRef = useRef<Set<string>>(new Set());
   const frameLoopRef = useRef<number>(0);
   const trainAnimRef = useRef<number>(0);
-  // Phase 1: Start with idle, then trigger greeting after 1s
+  // Phase 1: Start with idle, then trigger greeting after 1s — desktop only
   useEffect(() => {
+    if (isMobile) return;
     const timer = setTimeout(() => {
       setPhase('greeting');
       setRobotAnim('greeting');
     }, 300);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isMobile]);
 
   // Greeting complete → free-roam briefly, then train starts arriving.
   const onGreetingComplete = useCallback(() => {
@@ -100,7 +123,10 @@ export default function HomePage() {
   useEffect(() => {
     if (phase !== 'departing') return;
     const targetX = 100; // off-screen right
-    const SPEED = 70;    // % of viewport per second
+    // Mobile train is 2× wider (TRAIN_SCALE_MOBILE) so it has 2× more vw to
+    // travel before clearing the viewport — double the speed to keep depart
+    // duration consistent with desktop.
+    const SPEED = isMobile ? 140 : 70;    // % of viewport per second
     let currentX = trainX;
     let lastT = 0;
     let raf = 0;
@@ -284,7 +310,7 @@ export default function HomePage() {
   const aspectRatio = currentSprite.frameWidth / currentSprite.frameHeight;
 
   return (
-    <div className="homepage" style={{ ['--ui-scale' as string]: uiScale } as CSSProperties}>
+    <div className="homepage" style={{ ['--ui-scale' as string]: uiScale, ['--train-scale' as string]: trainScale } as CSSProperties}>
       {/* Header — logo + nav */}
       <SiteHeader
         hideNav
@@ -314,7 +340,7 @@ export default function HomePage() {
           className="train-container"
           style={{
             left: `${trainX}%`,
-            bottom: `calc(${100 - PLATFORM_Y}% - ${5 * uiScale}px + ${45 * uiScale}px)`,
+            bottom: `calc(${100 - PLATFORM_Y}% - ${5 * uiScale}px + ${45 * uiScale}px${isMobile ? ' - 25px' : ''})`,
           }}
         >
           <img src={`${import.meta.env.BASE_URL}sprites/Final_train.png`} alt="train" className="train-body" />
@@ -353,8 +379,8 @@ export default function HomePage() {
             className={`robot-container anim-${robotAnim}`}
             style={{
               left: `${robotX}%`,
-              bottom: `calc(${100 - PLATFORM_Y}% - 2px + ${45 * uiScale}px)`,
-              transform: `translateX(calc(-50% + ${xOffset * uiScale}px)) translateY(${yOffset * uiScale}px)`,
+              bottom: `calc(${100 - PLATFORM_Y}% - 2px + ${45 * uiScale}px${isMobile ? ' - 31px' : ''})`,
+              transform: `translateX(calc(-50% + ${xOffset * uiScale}px${isMobile ? ' - 1px' : ''})) translateY(${yOffset * uiScale}px)`,
               // Drop robot below doors (z 30) during the closing animation so the
               // panels visually cover it as they slide back into place.
               zIndex: phase === 'boarding' && !doorsOpen ? 1 : 10,
@@ -407,23 +433,8 @@ export default function HomePage() {
         return (
           <nav className={`side-nav ${sideNavExiting ? 'exiting' : ''} ${phase === 'awaiting-dest' ? 'focused' : ''}`}>
             <Link to="/about" onClick={(e) => { e.preventDefault(); queueRoute('/about'); }}>About</Link>
-            <div className="side-nav-dropdown">
-              <button
-                type="button"
-                className="side-nav-trigger"
-                onClick={(e) => {
-                  // Tap-to-toggle on touch / keyboard. CSS handles hover.
-                  e.currentTarget.parentElement?.classList.toggle('open');
-                }}
-              >
-                Projects
-              </button>
-              <div className="side-nav-sub">
-                <Link to="/projects" onClick={(e) => { e.preventDefault(); queueRoute('/projects'); }}>Personal</Link>
-                <Link to="/work" onClick={(e) => { e.preventDefault(); queueRoute('/work'); }}>Work</Link>
-              </div>
-            </div>
-            <Link to="/blog" onClick={(e) => { e.preventDefault(); queueRoute('/blog'); }}>Blog</Link>
+            <Link to="/projects" onClick={(e) => { e.preventDefault(); queueRoute('/projects'); }}>Personal Projects</Link>
+            <Link to="/work" onClick={(e) => { e.preventDefault(); queueRoute('/work'); }}>Work Projects</Link>
             <Link to="/contact" onClick={(e) => { e.preventDefault(); queueRoute('/contact'); }}>Contact</Link>
           </nav>
         );

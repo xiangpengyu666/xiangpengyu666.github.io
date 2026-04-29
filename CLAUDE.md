@@ -320,9 +320,58 @@ Each project's slides live at `public/<projects|work>/<slug>/slides/NN.webp`, na
 
 **How the Figma display order was derived** (for the initial batch): fetched `get_metadata` on the overview canvas (node `133:460`) which includes all projects' slides laid out in columns. Extracted `(x, y)` coords for every `Slide 16:9 - N` frame, grouped by x (= project column), sorted by y ascending (= display order). Saved as a 57-row table which drove `scripts/fix-slide-order.mjs`.
 
-### Planned pages (stubs in destination modal + nav)
+### Mobile responsive (Round 3 — viewport ≤ 768px)
 
-`/blog`, `/contact` — nav dropdown items route there, but the routes aren't registered in `App.tsx`. Clicking them plays the full boarding animation and then lands on a blank screen. When building these pages, register them in `App.tsx` alongside the existing `/`, `/about`, `/projects`, `/work`.
+Single-breakpoint rule set lives in `src/styles/mobile.css`, imported **last** in `App.tsx` so its `@media (max-width: 768px)` overrides win source-order ties against page-specific CSS. Desktop layout is untouched: every rule is media-gated.
+
+**TS-side breakpoint sync** — `src/hooks/useIsMobile.ts` exports `MOBILE_BREAKPOINT = 768` and a hook returning a reactive boolean. Pages use it to skip desktop-only state machines: ProjectsPage / WorkProjectsPage / HomePage all initialize their `phase` state to a "post-boarding" value (`free-roam` / `doors-open`) on mobile so the train-arriving / greeting / disembark useEffects naturally no-op (each early-returns when `phase !== its target`).
+
+**Document scroll unlock** — `global.css` sets `html, body, #root { overflow: hidden; height: 100% }` so the desktop fixed-viewport scenes don't introduce scrollbars. mobile.css overrides that on small screens (`overflow: auto !important; height: auto !important`) so the vertical-stacked content can scroll naturally.
+
+**Hamburger drawer** (`SiteHeader.tsx`):
+- Always rendered; hidden on desktop via CSS.
+- Half-viewport-wide drawer slides in from the right (`width: 50vw`).
+- Items: About / Personal Projects / Work Projects / Contact, separated by 1px `#808080` dividers, font 0.95rem, padding 1.8rem (the per-item dividers + padding give the visual rhythm — no flex `gap`).
+- Locks `body { overflow: hidden }` while open so iOS rubber-band doesn't reveal the page beneath.
+- Hidden on HomePage mobile (`.homepage .hamburger { display: none }`) — the side-nav serves as the nav surface there.
+
+**HomePage mobile** (option-C "simplified narrative"):
+- Train pre-parked, doors already open, robot at door from mount — boarding sequence runs only when the user picks a destination.
+- `TRAIN_SCALE_MOBILE = 2.5` (vs desktop 1.25) so the train reads as the hero visual on portrait. `TRAIN_PARKED_X = 50 - 0.835 × TRAIN_WIDTH_VW` so the door (at +83.5% of train width) lands exactly at viewport 50%, lined up with the robot which sits at 50%. `--train-scale` is injected inline as a CSS var on `.homepage` based on `isMobile`.
+- `departing` SPEED is doubled on mobile (140 vs 70 %/s) because the 2× train has 2× the viewport distance to travel before clearing.
+- Side-nav is repositioned: instead of right-edge / vertical-center, it sits horizontally centered below the welcome paragraph (`left: 50%; transform: translate(-50%, 0); margin-top: calc(13.5rem + 75px)`) but keeps the desktop bullet-on-left + vertical-guide-line layout inside the centered block. Items are 4 flat links (About / Personal Projects / Work Projects / Contact) — desktop's Projects dropdown was flattened.
+- Welcome text: h1 1rem, p 0.833rem, "Hi!" still 1.6em of parent.
+- Platform image scaled `transform: scale(2)` from `bottom center` on HomePage only.
+- Robot inline `bottom` adds `- 31px` and inline `transform` adds `- 1px` X on mobile (positional nudges tuned at ~390px width).
+- Train inline `bottom` adds `- 25px` on mobile, plus a `.train-container { transform: translateX(-5px) }` visual nudge.
+
+**ProjectsPage / WorkProjectsPage mobile**:
+- `.scene` resets from absolute scene-vw + camera-translate to normal flow; train / robot / arrows / platform-row hidden via `.projects-page .X { display: none }` (scoped so HomePage's scene survives).
+- `.projects-row` becomes flex-column with `padding: calc(6.5rem - 80px) 1.2rem 2rem; gap: 2.6rem`.
+- `.project-card` is full-width; project-title font 0.8rem.
+- `onCardClick` short-circuits on mobile: directly sets `activeProject` + `phase = 'project-detail'` (no walk / jump).
+- "To Be Continued" sign hidden.
+- WorkProjectsPage square thumb is centered (`margin: 0 auto`); number / title / desc have `margin-left: calc((100% - 76.073%) / 2)` so they align to the image's left edge, not the card's left edge.
+
+**AboutPage mobile**:
+- Desktop figma-canvas + train + robot + platform + splash title all hidden via `display: none`.
+- A separate `<section className="about-mobile">` (always rendered, hidden on desktop) provides the single-column reflow: portrait (1:1, rounded) → "About me" h1 → quote → "Experience" h2 → vertical timeline list. Each timeline `<li>` is a clickable header (label / place / meta) + collapsible description, sharing the desktop `expanded` state and `toggleExpand` handler.
+
+**ProjectDetailModal mobile**: `width: 100vw; height: 100vh; border-radius: 0; margin: 0`; `.project-detail-zoom` (width zoom controls) hidden — only close button remains.
+
+### Contact page (`ContactPage.tsx`, route: `/contact`)
+
+Standalone non-narrative page. Renders email link + résumé download + inline PDF preview.
+
+- `RESUMES` map keyed by `'cn' | 'en'` — both currently point at `public/Xiangpeng-Yu-Resume.pdf` (the EN entry is a placeholder until the English PDF is uploaded; swap its `url` to `public/Xiangpeng-Yu-Resume-EN.pdf` when ready).
+- Download attribute uses ASCII names (`Xiangpeng_Yu_CV_CN.pdf` / `Xiangpeng_Yu_CV_EN.pdf`) so saved files don't surprise the user with URL-encoded Chinese in the filename.
+- Pill-shaped `.contact-lang-toggle` switches the active language; `<object key={lang}>` remounts the PDF viewer so the URL change actually reloads.
+- Preview URL appends `#view=Fit&toolbar=0&navpanes=0&scrollbar=0` to force fit-to-page on load and hide the native viewer's chrome (Chrome/Edge/Firefox honor it; Safari only respects `#view`).
+- `.contact-pdf` uses `aspect-ratio: 1 / 1.414` (A4) + `height: auto` so the viewer's empty letterbox area below the page doesn't render as a black block. No outer border (the PDF viewer paints its own page frame).
+
+### Planned pages
+
+`/blog` removed from nav (April 2026). All four destinations (About / Personal / Work / Contact) now have routes registered in `App.tsx` and working pages.
 
 ### ⚠ TODO — remind the user next session
 

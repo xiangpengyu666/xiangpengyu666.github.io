@@ -1,0 +1,446 @@
+/* ════════════════════════════════════════════════════════════════════════
+   Mobile overrides (≤768px) — Round 3.
+   Imported LAST in App.tsx so these rules win source-order ties against
+   page-specific CSS. Desktop layout is untouched: every rule lives inside
+   @media (max-width: 768px).
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Hamburger button (always rendered by SiteHeader, hidden by default) ── */
+.hamburger {
+  display: none;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  z-index: 220;
+}
+
+.hamburger span {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  background: #1a1a1a;
+  border-radius: 1px;
+  transition: transform 0.25s ease, opacity 0.18s ease, top 0.25s ease;
+}
+.hamburger span:nth-child(1) { top: 10px; }
+.hamburger span:nth-child(2) { top: 17px; }
+.hamburger span:nth-child(3) { top: 24px; }
+
+.hamburger.open span:nth-child(1) { top: 17px; transform: rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { top: 17px; transform: rotate(-45deg); }
+
+/* ── Mobile drawer (hidden by default; shown via .open below 768px) ── */
+.mobile-drawer-overlay,
+.mobile-drawer {
+  display: none;
+}
+
+/* ── About mobile block (hidden by default; rendered on mobile only) ── */
+.about-mobile { display: none; }
+
+@media (max-width: 768px) {
+  /* ── Document-level scroll unlock ──
+     global.css sets html/body/#root { overflow: hidden; height: 100% } so the
+     desktop fixed-viewport layout (train station scene) doesn't introduce
+     scrollbars. On mobile we *want* the document to scroll because content
+     stacks vertically and exceeds viewport height. */
+  html, body, #root {
+    overflow: auto !important;
+    height: auto !important;
+    min-height: 100%;
+  }
+
+  /* ── Site header sizing on mobile — slim and tidy ── */
+  .site-header {
+    padding: 0.9rem 1.1rem !important;
+  }
+  .logo {
+    font-size: 3rem !important;
+  }
+
+  /* Hide desktop top nav; hamburger takes over */
+  .site-nav { display: none !important; }
+
+  /* Show hamburger */
+  .hamburger { display: block; }
+
+  /* Drawer overlay (dim background) */
+  .mobile-drawer-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 200;
+  }
+  .mobile-drawer-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Drawer panel (slides in from right) — half-viewport width, items
+     separated by 1px #808080 dividers. */
+  .mobile-drawer {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 50vw;
+    background: #fff;
+    padding: 5.5rem 1.4rem 2rem;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 210;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.08);
+  }
+  .mobile-drawer.open { transform: translateX(0); }
+
+  .mobile-drawer a {
+    font-family: var(--font-fahkwang);
+    /* Halved from 1.9rem per design tweak */
+    font-size: 0.95rem;
+    color: #1a1a1a;
+    text-decoration: none;
+    line-height: 1.2;
+    padding: 1.8rem 0;
+    border-bottom: 1px solid #808080;
+    transition: opacity 0.15s ease;
+  }
+  .mobile-drawer a:last-child { border-bottom: none; }
+  .mobile-drawer a:active { opacity: 0.55; }
+
+  /* ════ HomePage simplified mobile flow (R3-5) ════
+     Hide desktop side-nav focus dim (modal-style) but KEEP the side-nav
+     itself — on mobile we re-purpose it as the in-page nav, centered below
+     the welcome paragraph instead of clinging to the right edge. */
+  .side-nav-focus-dim {
+    display: none !important;
+  }
+  /* Enable vertical scroll on the homepage (desktop locks it at 100vh). The
+     side-nav + welcome + bottom scene stack taller than a portrait viewport
+     so the user needs to scroll to see everything. */
+  .homepage {
+    height: auto !important;
+    min-height: 100vh;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  /* Re-position side-nav for mobile: the WHOLE BLOCK is horizontally
+     centered, but inside the block items keep the desktop layout — bullets
+     left-aligned with text, vertical guide line on the left edge. */
+  .side-nav {
+    top: auto !important;
+    right: auto !important;
+    left: 50% !important;
+    bottom: auto !important;
+    transform: translate(-50%, 0) !important;
+    margin-top: calc(13.5rem + 75px);
+    /* Inherit desktop's flex-start (bullets left); only override what desktop
+       set in vw / ui-scale terms that doesn't fit a small portrait viewport. */
+    gap: 3rem !important;
+  }
+  .side-nav a,
+  .side-nav-trigger {
+    font-size: 1.2rem !important;
+    gap: 0.6rem !important;
+  }
+  .side-nav a::before,
+  .side-nav-trigger::before {
+    width: 0.45rem !important;
+    height: 0.45rem !important;
+  }
+  /* Override desktop's keyframe-based translateY(-50%) anchor on entry/exit */
+  .side-nav,
+  .side-nav.exiting {
+    animation: none !important;
+  }
+  /* Hide hamburger on HomePage mobile — side-nav is the nav surface here.
+     Other pages (no in-page nav) still get the hamburger. */
+  .homepage .hamburger {
+    display: none !important;
+  }
+  /* Visual nudge — train sits 5px left of the JS-computed position so it
+     lines up with the robot a touch better on mobile. */
+  .homepage .train-container {
+    transform: translateX(-5px);
+  }
+  /* Platform 2× on mobile so it reads at the same proportion as the bigger
+     train. Origin bottom-center keeps it anchored to viewport bottom. */
+  .homepage .platform-img {
+    transform: scale(2);
+    transform-origin: bottom center;
+  }
+  .welcome {
+    /* Push welcome down a bit and constrain width to readable column */
+    top: calc(8rem - 5px) !important;
+    left: 1.2rem !important;
+    right: 1.2rem !important;
+  }
+  .welcome h1 {
+    font-size: 1rem !important;
+  }
+  .welcome-hi {
+    font-size: 1.6em !important;
+  }
+  .welcome p {
+    font-size: 0.833rem !important;
+    margin-top: calc(1rem + 10px) !important;
+  }
+  /* Hide desktop keyboard hint on mobile (no keyboard) */
+  .controls-hint { display: none !important; }
+
+  /* ════ Projects + Work pages — vertical card list (R3-2) ════ */
+  .projects-page {
+    height: auto !important;
+    min-height: 100vh;
+    overflow-y: auto !important;
+  }
+  /* Hide train/robot/arrows/platform — scoped to .projects-page only so
+     HomePage's scene survives. .scene becomes a passive vertical container
+     (its children — cards — still render). */
+  .projects-page .train-container,
+  .projects-page .robot-container,
+  .projects-page .nav-arrow,
+  .projects-page .platform-row {
+    display: none !important;
+  }
+  /* Reset .scene from absolute scene-vw + camera-translate to normal flow */
+  .projects-page .scene {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    transform: none !important;
+  }
+  /* Reset projects-row from absolute scene-vw layout to a normal vertical flow */
+  .projects-row {
+    position: static !important;
+    height: auto !important;
+    opacity: 1 !important;
+    padding: calc(6.5rem - 80px) 1.2rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.6rem;
+  }
+  .project-card {
+    position: static !important;
+    width: 100% !important;
+    transform: none !important;
+    margin: 0 !important;
+  }
+  .project-card[role="button"]:hover {
+    transform: none !important;
+  }
+  .project-number {
+    font-size: 1.6rem !important;
+    margin-bottom: 0.4rem !important;
+  }
+  .project-thumb {
+    margin-bottom: 0.6rem !important;
+  }
+  .project-title {
+    font-size: 0.8rem !important;
+  }
+  .project-desc {
+    font-size: 0.95rem !important;
+  }
+  /* "To Be Continued" sign hidden on mobile per design — vertical card list
+     ends naturally without the decorative end-of-platform sign. */
+  .to-be-continued {
+    display: none !important;
+  }
+
+  /* WorkProjectsPage square thumbnail centered on mobile (desktop is left-
+     aligned to match title baseline). Number/title align to the IMAGE's left
+     edge — the image is 76.073% wide centered, so its left edge sits at
+     (100% - 76.073%) / 2 ≈ 11.96% of the card. Push number/title in by the
+     same amount so they line up with the image. */
+  .work-projects-page .project-thumb {
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  .work-projects-page .project-number,
+  .work-projects-page .project-title,
+  .work-projects-page .project-desc {
+    margin-left: calc((100% - 76.073%) / 2);
+  }
+  /* Welcome title above project list */
+  .projects-title {
+    position: static !important;
+    padding: 1.5rem 1.2rem 0;
+    text-align: left !important;
+  }
+  .projects-title h1 {
+    font-size: 1.5rem !important;
+  }
+
+  /* ════ AboutPage single-column reflow (R3-3) ════ */
+  .about-page {
+    height: auto !important;
+    min-height: 100vh;
+    overflow-y: auto !important;
+  }
+  /* Hide figma-canvas absolute layout on mobile; rendered by sibling .about-mobile */
+  .figma-canvas,
+  .about-platform,
+  .about-train,
+  .about-robot,
+  .about-splash-title {
+    display: none !important;
+  }
+  /* Mobile reflow content */
+  .about-mobile {
+    display: flex;
+    flex-direction: column;
+    padding: calc(5rem + 20px) 1.4rem 3rem;
+    gap: 0.6rem;
+    color: #000;
+    font-family: var(--font-fahkwang);
+  }
+  .am-portrait {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 18px;
+    object-fit: cover;
+    display: block;
+    margin-bottom: 1.4rem;
+  }
+  .am-heading {
+    font-size: 2.6rem;
+    font-weight: 600;
+    line-height: 1;
+    margin: 0;
+  }
+  .am-quote {
+    font-size: 1.05rem;
+    font-style: italic;
+    color: #1a1a1a;
+    margin: 0.5rem 0 2.4rem;
+  }
+  .am-experience-title {
+    font-size: 1.7rem;
+    font-weight: 600;
+    margin: 0 0 1.2rem;
+  }
+  .am-timeline {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    position: relative;
+  }
+  .am-timeline::before {
+    /* Vertical guide line behind the dots */
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 14px;
+    bottom: 14px;
+    width: 1.5px;
+    background: #1a1a1a;
+    opacity: 0.25;
+  }
+  .am-item {
+    position: relative;
+  }
+  .am-item-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    background: transparent;
+    border: none;
+    padding: 0.65rem 0;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    color: #9b9b9b;
+    transition: color 0.2s ease;
+  }
+  .am-item.is-active .am-item-head { color: #000; }
+  .am-dot {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-top: 0.4rem;
+    background: #F2D18B;
+    box-shadow: 0 0 4px rgba(242, 209, 139, 0.5),
+                0 0 10px rgba(242, 209, 139, 0.22);
+  }
+  .am-head-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    line-height: 1.25;
+  }
+  .am-label {
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: inherit;
+  }
+  .am-place {
+    font-size: 0.95rem;
+    color: inherit;
+    margin-top: 0.15rem;
+  }
+  .am-meta {
+    font-size: 0.78rem;
+    color: #9b9b9b;
+  }
+  .am-desc {
+    margin: 0.2rem 0 1rem 2.3rem;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: #1a1a1a;
+    font-family: var(--font-body, system-ui, sans-serif);
+  }
+  .am-desc strong { font-weight: 600; }
+
+  /* ════ ContactPage — shrink email/link text so it fits narrow viewport ════ */
+  .contact-list {
+    font-size: 0.85rem;
+  }
+  .contact-list li {
+    font-size: 0.85rem;
+    gap: 0.6rem;
+  }
+  .contact-label {
+    width: 4rem;
+    font-size: 0.75rem;
+  }
+  .contact-list a {
+    font-size: 0.85rem;
+    word-break: break-all;
+  }
+  .contact-main {
+    padding: 5.5rem 1.2rem 3rem;
+  }
+
+  /* ════ ProjectDetailModal full-screen on mobile (R3-4) ════ */
+  .project-detail-overlay { padding: 0 !important; }
+  .project-detail-container {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+  /* Width zoom controls don't make sense on mobile */
+  .project-detail-zoom { display: none !important; }
+  .project-detail-close {
+    top: 0.8rem !important;
+    right: 0.8rem !important;
+  }
+}

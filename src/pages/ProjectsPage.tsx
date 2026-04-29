@@ -17,6 +17,7 @@ const DETAIL_COMPONENTS: Record<string, () => JSX.Element> = {
   '05': PuppyPoopLoopDetail,
 };
 import useUiScale from '../hooks/useUiScale';
+import useIsMobile from '../hooks/useIsMobile';
 import './ProjectsPage.css';
 
 type Phase =
@@ -58,14 +59,18 @@ const TO_BE_CONTINUED_X_VW = 265;
 
 export default function ProjectsPage() {
   const uiScale = useUiScale();
-  const [phase, setPhase] = useState<Phase>('train-entering');
+  const isMobile = useIsMobile();
+  // On mobile we skip the entire boarding/disembark/title sequence — start at
+  // free-roam with cards already visible. The phase-gated useEffects below
+  // naturally no-op because they all early-return when phase !== their target.
+  const [phase, setPhase] = useState<Phase>(isMobile ? 'free-roam' : 'train-entering');
   const [robotAnim, setRobotAnim] = useState<RobotAnim>('idle');
   const [robotX, setRobotX] = useState(0);     // vw in scene coordinates
   const [trainX, setTrainX] = useState(-TRAIN_WIDTH_VW);  // % from left (fully off-screen left)
   const [doorsOpen, setDoorsOpen] = useState(false);
   const [robotVisible, setRobotVisible] = useState(false); // hidden until exits train
   const [titleOpacity, setTitleOpacity] = useState(0);
-  const [cardsVisible, setCardsVisible] = useState(false);
+  const [cardsVisible, setCardsVisible] = useState(isMobile);
   const [cameraX, setCameraX] = useState(0);   // vw offset applied to scene
   const [activeProject, setActiveProject] = useState<typeof PROJECTS[number] | null>(null);
   const [robotDxPx, setRobotDxPx] = useState(0);  // fine x offset in px (for disembark slide)
@@ -414,8 +419,14 @@ export default function ProjectsPage() {
   }, [getNearestProjectIndex, walkToProject]);
 
   const onCardClick = useCallback((proj: typeof PROJECTS[number]) => {
+    // Mobile: no robot/walk/jump sequence — open detail modal directly.
+    if (isMobile) {
+      setActiveProject(proj);
+      setPhase('project-detail');
+      return;
+    }
     walkToProject(proj, true, 2);
-  }, [walkToProject]);
+  }, [walkToProject, isMobile]);
 
   const getCurrentSprite = () => {
     switch (robotAnim) {

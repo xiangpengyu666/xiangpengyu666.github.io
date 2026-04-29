@@ -504,6 +504,51 @@ export default function AboutPage() {
           />
         </div>
       )}
+
+      {/* ════ Mobile reflow (R3-3) ════
+          Always rendered; hidden via CSS on desktop. The figma-canvas above
+          is its mirror image — both fade in via .is-revealing on the page
+          root. On mobile we don't care about the L→R reveal stagger; CSS
+          opts-out of it for .about-mobile. Click toggles expansion same as
+          desktop dots/labels. */}
+      <section className="about-mobile" aria-hidden={false}>
+        <img className="am-portrait" src={PORTRAIT} alt="Xiangpeng Yu" />
+        <h1 className="am-heading">About me</h1>
+        <p className="am-quote">"I shape ideas. I ship solutions."</p>
+
+        <h2 className="am-experience-title">Experience</h2>
+
+        <ol className="am-timeline">
+          {TIMELINE.map((entry, i) => {
+            const active = expanded.has(i);
+            return (
+              <li
+                key={entry.place}
+                className={`am-item${active ? ' is-active' : ''}`}
+              >
+                <button
+                  type="button"
+                  className="am-item-head"
+                  aria-expanded={active}
+                  onClick={() => toggleExpand(i)}
+                >
+                  <span className="am-dot" />
+                  <span className="am-head-text">
+                    <span className="am-label">{entry.label}</span>
+                    <span className="am-place">{entry.place}</span>
+                    {entry.meta.split('\n').map((line) => (
+                      <span key={line} className="am-meta">{line}</span>
+                    ))}
+                  </span>
+                </button>
+                {active && (
+                  <p className="am-desc">{entry.desc}</p>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </section>
     </div>
   );
 }
