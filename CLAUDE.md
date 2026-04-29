@@ -126,7 +126,6 @@ The interactive scenes are scaled by a single factor `--ui-scale` injected as a 
 - `public/about/portrait.webp` — single 1200×1200 portrait used by AboutPage (`image 495` from Figma `162:64`, compressed via inline sharp call)
 - `scripts/compress-projects.mjs` — sharp-based one-shot script to convert `public/projects/*.png` → `*.webp` (width 1200, quality 80). Run via `node scripts/compress-projects.mjs` after dropping in new PNGs from Figma. The work-page assets were compressed with the same parameters but inline (no dedicated script).
 - `jump_spritesheet.png` is defined in `SPRITES` but not used on the homepage — used on ProjectsPage for the project-jump interaction
-- `public/bg.png` is **no longer referenced** — homepage background is plain white and the logo / nav / intro text are HTML
 
 ### Platform & ground shadows (all three pages)
 
