@@ -15,7 +15,7 @@ const RESUMES: Record<Lang, { url: string; downloadName: string; label: string }
   },
   cn: {
     url: `${import.meta.env.BASE_URL}Xiangpeng-Yu-Resume-CN.pdf`,
-    downloadName: 'Xiangpeng_Yu_CV_CN.pdf',
+    downloadName: '于翔鹏简历.pdf',
     label: '中文',
   },
 };
